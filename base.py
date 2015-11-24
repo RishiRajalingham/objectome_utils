@@ -74,7 +74,9 @@ HVM_models = ['Apple_Fruit_obj', 'Apricot_obj', 'BAHRAIN', 'Beetle', 'CGTG_L', '
     'face0002', 'face0003', 'face0004', 'face0005', 'face0006', 'face0007', 'face0008', 'hedgehog', 'junkers88', 'mig29',
      'motoryacht', 'raspberry_obj', 'rdbarren', 'sopwith', 'support', 'walnut_obj', 'watermelon_obj', 'z3']
 
-HVM_models_8 = []
+HVM_10 = [ 'bear', 'ELEPHANT_M', '_18', 'face0001', 'alfa155', 'breed_pug', 'TURTLE_L', 'Apple_Fruit_obj',  'f16', '_001'] # first half of MURI20 image set, intersects with hvm set
+#bear, elephant, table, face, 
+#HVM new (6): car, dog, turtle, apple, chair, plane 
 
 """ Utilities relating to objectome objects"""
 
@@ -101,3 +103,15 @@ def get_index_MWorksRelative(img_id):
         return obj24images.index(img_id)+1
     else:
         return np.nan
+
+def get_hvm_3dmodelnames(models_hvm):
+    HVM_models_v2 = []
+    for mobj in models_hvm:
+        if mobj[0] == '_':
+            objout = mobj[1:] + '_POV_geom'
+        elif mobj[:4] == 'face':
+            objout = mobj
+        else:
+            objout = mobj + '_POV_geom'
+        HVM_models_v2.append(objout)
+    return HVM_models_v2

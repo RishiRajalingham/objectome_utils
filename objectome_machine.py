@@ -95,6 +95,24 @@ def getClassifierRecord(features_task, meta_task, n_splits=1, classifiertype='sv
 
     return utils.compute_metric_base(features_task, meta_task, evalc, attach_models=True, return_splits=True)
     
+def getSplitHalfPerformance(rec, meta):
+    nsplits = len(rec['splits'][0])
+    perf_img = []
+    for i in range(nsplits):
+        split_ind = rec['splits'][0][i]['test']
+        pred = rec['split_results'][i]['test_prediction']
+        true = meta[split_ind]['obj']
+        perf_img_ = [pred[ii] == true[ii] for ii in range(len(pred))]
+        perf_img.extend(perf_img_)
+    np.random.shuffle(perf_img)
+    perf1 = np.mean(perf_img[-len(perf_img)/2:])
+    perf2 = np.mean(perf_img[:len(perf_img)/2])
+
+    return perf1, perf2
+
+
+      
+
 
 def getSilencedPerformance(features_s, meta, rec, obj_idx=None):
     nsplits = len(rec['splits'][0])
@@ -173,7 +191,7 @@ def format_trials_var(trials):
         trials = np.array(trials).astype('double')
         return trials
 
-def getPerformanceFromFeatures_base(features, meta, task, objects_oi=None, features_s=None):
+def getPerformanceFromFeatures_base(features, meta, task, objects_oi=None, features_s=None, nsplits=1):
 
     features_task = np.squeeze(features[task,:])
     
@@ -185,7 +203,7 @@ def getPerformanceFromFeatures_base(features, meta, task, objects_oi=None, featu
     for i,m in enumerate(objects_oi):
         obj_idx[m] = i
     
-    rec = getClassifierRecord(features_task, meta_task)
+    rec = getClassifierRecord(features_task, meta_task, nsplits)
     trials, trials_io = getTrialsFromRecord(rec, meta_task, obj_idx)
     performance = 1-rec['accbal_loss']
     
@@ -230,9 +248,11 @@ def computePairWiseConfusions(objects_oi, OUTPATH=None, silence_mode=0):
     else:
         all_features = {}
         all_metas = {}
-        f,m = obj.getNYUFeatures(objs_oi)
-        all_features['NYU'] = f
-        all_metas['NYU'] = m
+        f,m = obj.getVGGFeatures(objs_oi)
+        all_features['VGG'] = f
+        all_metas['VGG'] = m
+
+
     result = {}
     
     for feat in all_features:
@@ -250,9 +270,9 @@ def computePairWiseConfusions(objects_oi, OUTPATH=None, silence_mode=0):
             features_s = None
         
         for task in tasks:
-            features_task = features[task,:]
-            meta_task = meta[task]
-            p_, p_s_, t_, t_io_, t_s_ = getPerformanceFromFeatures_base(features_task, meta_task, task, objs_oi, features_s)
+            # features_task = features[task,:]
+            # meta_task = meta[task]
+            p_, p_s_, t_, t_io_, t_s_ = getPerformanceFromFeatures_base(features, meta, task, objs_oi, features_s, nsplits=100)
             trials.extend(t_)
             trials_io.extend(t_io_)
 

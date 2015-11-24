@@ -170,14 +170,12 @@ def getNYUFeatures(objects_oi, layer=6):
     meta_ = meta[meta_ind]
     return features, meta_
 
-def getVGGFeatures(objects_oi, layer=6):
-    """ NYU model features (Zeiler 2013) -- see archconvnet """
+def getVGGFeatures(objects_oi, layer=8):
+    """ VGG features -- from Caffe """
     meta = pk.load(open(IMGPATH + 'metadata.pkl', 'r'))
-    if layer == 6:
-        feature_data = pk.load(open(IMGPATH + 'vgg_features/fc6.pkl', 'r'))
-    elif layer == 5:
-        feature_data = pk.load(open(IMGPATH + 'vgg_features/pool5.pkl', 'r'))
-
+    if layer == 8:
+        feature_data = pk.load(open(IMGPATH + 'vgg_features/fc8.pkl', 'r'))
+    
     fid, features = [], []
     for f in feature_data:
         fid.append(f['id'])
