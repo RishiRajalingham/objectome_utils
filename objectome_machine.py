@@ -248,10 +248,16 @@ def computePairWiseConfusions(objects_oi, OUTPATH=None, silence_mode=0):
     else:
         all_features = {}
         all_metas = {}
-        f,m = obj.getVGGFeatures(objs_oi)
-        all_features['VGG'] = f
-        all_metas['VGG'] = m
+        # f,m = obj.getVGGFeatures(objs_oi)
+        # all_features['VGG'] = f
+        # all_metas['VGG'] = m
+        # f,m = obj.getCaffeFeatures(objects_oi)
+        # all_features['Caffe'] = f
+        # all_metas['Caffe'] = m
 
+        f,m = obj.getCaffeNOBGFeatures(objects_oi)
+        all_features['CaffeNOBG'] = f
+        all_metas['CaffeNOBG'] = m
 
     result = {}
     
@@ -270,8 +276,6 @@ def computePairWiseConfusions(objects_oi, OUTPATH=None, silence_mode=0):
             features_s = None
         
         for task in tasks:
-            # features_task = features[task,:]
-            # meta_task = meta[task]
             p_, p_s_, t_, t_io_, t_s_ = getPerformanceFromFeatures_base(features, meta, task, objs_oi, features_s, nsplits=100)
             trials.extend(t_)
             trials_io.extend(t_io_)

@@ -6,6 +6,7 @@ from dldata.stimulus_sets.hvm import ImgLoaderResizer
 
 
 IMGPATH = '/mindhive/dicarlolab/u/rishir/stimuli/objectome64s100/'
+NOBGIMGPATH = '/mindhive/dicarlolab/u/rishir/stimuli/objectome64s100nobg'
 HOMEPATH = '/mindhive/dicarlolab/u/rishir/monkey_objectome/machine_behaviour/'
 
 def getPixelFeatures(objects_oi, normalize_on=False):
@@ -170,12 +171,67 @@ def getNYUFeatures(objects_oi, layer=6):
     meta_ = meta[meta_ind]
     return features, meta_
 
+def getCaffeFeatures(objects_oi, layer=8):
+    """ Caffe reference model -- from Caffe """
+    meta = pk.load(open(IMGPATH + 'metadata.pkl', 'r'))
+    
+    if layer == 8:
+        # feature_data = np.load(IMGPATH + 'caffe_features//fc8.pkl')
+        feature_data = pk.load(open(IMGPATH + 'caffe_features/fc8.pkl', 'r'))
+    fid, features = [], []
+    for f in feature_data:
+        fid.append(f['id'])
+        features.append(f['feature'])
+
+    features = np.array(features)
+        
+    """ fix obj field"""
+    if len(meta[0]['obj']) == 1:
+        for i,m in enumerate(meta):
+            meta[i]['obj'] = m['obj'][0]
+    meta_ind = []
+    for f in fid:
+        ind = np.array(np.nonzero(meta['id'] == f)).flatten()[0]
+        meta_ind.append(ind)
+
+    meta_ = meta[meta_ind]
+    return features, meta_
+
+def getCaffeNOBGFeatures(objects_oi, layer=8):
+    """ Caffe reference model -- from Caffe """
+    meta = pk.load(open(IMGPATH + 'metadata.pkl', 'r'))
+    
+    if layer == 8:
+        # feature_data = np.load(IMGPATH + 'caffe_features//fc8.pkl')
+        feature_data = np.load(open(NOBGIMGPATH + 'caffe_features/obj64s100nobg_caffe_reference_model_fc8.npy'))
+    fid, features = [], []
+    for f in feature_data:
+        fid.append(f['id'])
+        features.append(f['feature'])
+
+    features = np.array(features)
+        
+    """ fix obj field"""
+    if len(meta[0]['obj']) == 1:
+        for i,m in enumerate(meta):
+            meta[i]['obj'] = m['obj'][0]
+    meta_ind = []
+    for f in fid:
+        ind = np.array(np.nonzero(meta['id'] == f)).flatten()[0]
+        meta_ind.append(ind)
+
+    meta_ = meta[meta_ind]
+    return features, meta_
+
+
 def getVGGFeatures(objects_oi, layer=8):
     """ VGG features -- from Caffe """
     meta = pk.load(open(IMGPATH + 'metadata.pkl', 'r'))
-    if layer == 8:
-        feature_data = pk.load(open(IMGPATH + 'vgg_features/fc8.pkl', 'r'))
+    # if layer == 8:
+    #     feature_data = pk.load(open(IMGPATH + 'vgg_features/fc8.pkl', 'r'))
     
+    if layer == 8:
+        feature_data = np.load(IMGPATH + 'vgg_features/obj64s100_VGG_S_model_fc8.npy')
     fid, features = [], []
     for f in feature_data:
         fid.append(f['id'])
@@ -222,3 +278,5 @@ def getAllFeatures(objects_oi):
     # print all_features['NYU_pca'].shape
 
     return all_features, all_metas
+
+    
