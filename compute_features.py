@@ -5,67 +5,56 @@ import sys
 import os
 import matplotlib.pyplot as plt
 
-""" This is just a rewrite of Shay's script."""
+""" This is a slightly edited version of Shay's OM script."""
 
 caffe_root = '/om/user/shayo/caffe/caffe/';
-stimpath = '/mindhive/dicarlolab/common/shared_stimuli/rishi_mwk/'
-featurepath = '/mindhive/dicarlolab/common/shared_features/'
 
-imgset = 'obj64s100/'
+# stimpath = '/mindhive/dicarlolab/u/rishir/stimuli/objectome64s100/'
+stimpath = '/mindhive/dicarlolab/u/rishir/stimuli/objectome64s100nobg/'
 cnn_oi = 'caffe_reference'
 desired_layer = 'fc8'
-input_path = stimpath + imgset
-output_file = featurepath + imgset + cnn_oi + desired_layer
 
 
-""" Get image files """
-meta = pk.load(open(input_path + 'metadata.pkl'))
-filelist = [input_path + m['id'] + '.png' for m in meta]
+# Get image files
+meta = pk.load(open(stimpath + 'metadata.pkl'))
+filelist = [stimpath + 'images/' + m['id'] + '.png' for m in meta]
 print("There are "+str(len(filelist))+ " files")
 
-""" Set Model Parameters """
+# Set Model Parameters
 if cnn_oi == 'caffe_reference':
     input_size = 227
     dim = 1000
     proto_file = caffe_root + 'models/bvlc_reference_caffenet/deploy.prototxt'
     model_file = caffe_root + 'models/bvlc_reference_caffenet/bvlc_reference_caffenet.caffemodel'
+    model_input = '/om/user/shayo/caffe/caffe/models/bvlc_reference_caffenet'
+    output_path = stimpath + 'caffe_features/'
 elif cnn_oi == 'VGG_S':
     input_size = 224
     dim = 1000
     proto_file = caffe_root + 'models/VGG_CNN_S/VGG_CNN_S_deploy.prototxt'
     model_file = caffe_root + 'models/VGG_CNN_S/VGG_CNN_S.caffemodel'
+    output_file = stimpath + 'vgg_features/'
 
-sys.path.insert(0, caffe_root+'python')
+sys.path.insert(0, caffe_root + 'python')
+model_call = '/om/user/shayo/caffe/caffe/scripts/download_model_binary.py ' + model_input
 if not os.path.isfile(model_file):
     print("Model file is missing")
-    get_ipython().system(u'/om/user/shayo/caffe/caffe/scripts/download_model_binary.py /om/user/shayo/caffe/caffe/models/bvlc_reference_caffenet')
+    get_ipython().system(model_call)
 
 plt.rcParams['figure.figsize'] = (10,10)
 plt.rcParams['image.interpolation'] = 'nearest'
 plt.rcParams['image.cmap']='gray'
 caffe.set_mode_cpu()
 net = caffe.Net(proto_file, model_file, caffe.TEST)
-# input preprocessing: 'data' is the name of the input blob == net.inputs[0]
+
+# Preprocess input data
 transformer = caffe.io.Transformer({'data': net.blobs['data'].data.shape})
 transformer.set_transpose('data', (2,0,1))
 transformer.set_mean('data', np.load(caffe_root + 'python/caffe/imagenet/ilsvrc_2012_mean.npy').mean(1).mean(1)) # mean pixel
 transformer.set_raw_scale('data', 255)  # the reference model operates on images in [0,255] range instead of [0,1]
 transformer.set_channel_swap('data', (2,1,0))  # the reference model has channels in BGR order instead of RGB
 
-# """ Run model once """
-
-# # run the network just to findout the size
-# # set net to batch size of 50
-
-# net.blobs['data'].reshape(2,3,input_size,input_size)
-# net.blobs['data'].data[...] =  transformer.preprocess('data',caffe.io.load_image(filelist[0]))
-
-# out = net.forward()
-# layerSize = [(k, v.data.shape) for k, v in net.blobs.items()]
-
-# feat = net.blobs[desiredLayer].data[0]
-# dim=feat.shape[0]
-""" Run Model """
+# Run Model
 batchsize = 50
 net.blobs['data'].reshape(batchsize,3,input_size,input_size)
 indices = np.arange(0,1+len(filelist),batchsize)
@@ -93,7 +82,10 @@ for i,m in enumerate(meta):
         'model_id':cnn_oi }
     features_dict.append(f_)
 
-with open(output_file + '.pkl', 'wb') as _f:
+# Save output
+if os.path.exists(output_path) == False:
+    os.mkdir(output_path)
+with open(output_path + desired_layer + '.pkl', 'wb') as _f:
     pk.dump(features_dict, _f)
 
 # features_array = np.array(features_array)
