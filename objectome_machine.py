@@ -246,22 +246,13 @@ def computePairWiseConfusions(objects_oi, OUTPATH=None, silence_mode=0):
         all_features = pk.load(open('quickload_feature_data/features.pkl', 'r'))
         all_metas = pk.load(open('quickload_feature_data/metas.pkl', 'r'))
     else:
-        all_features = {}
-        all_metas = {}
-        # f,m = obj.getVGGFeatures(objs_oi)
-        # all_features['VGG'] = f
-        # all_metas['VGG'] = m
-        # f,m = obj.getCaffeFeatures(objects_oi)
-        # all_features['Caffe'] = f
-        # all_metas['Caffe'] = m
-
-        f,m = obj.getCaffeNOBGFeatures(objects_oi)
-        all_features['CaffeNOBG'] = f
-        all_metas['CaffeNOBG'] = m
+        all_features, all_metas = obj.getAllFeatures(objs_oi)
+        # features_oi = ['VGG', 'Caffe', 'CaffeNOBG']
+        features_oi = ['VGG']
 
     result = {}
     
-    for feat in all_features:
+    for feat in features_oi:
         print 'Running machine_objectome : \n' + str(objs_oi) + '\n ' + str(feat) + '\n\n'
 
         features = all_features[feat]
@@ -276,7 +267,7 @@ def computePairWiseConfusions(objects_oi, OUTPATH=None, silence_mode=0):
             features_s = None
         
         for task in tasks:
-            p_, p_s_, t_, t_io_, t_s_ = getPerformanceFromFeatures_base(features, meta, task, objs_oi, features_s, nsplits=100)
+            p_, p_s_, t_, t_io_, t_s_ = getPerformanceFromFeatures_base(features, meta, task, objs_oi, features_s, nsplits=50)
             trials.extend(t_)
             trials_io.extend(t_io_)
 
@@ -314,7 +305,9 @@ def save_trials(trials, objs, outfn):
     mat_data['data'] = trials
     mat_data['models'] = objs
     scipy.io.savemat(outfn,mat_data)
-    print 'Saved ' + outfn
+    hr = (trials[:,0] == trials[:,3])
+    perf = hr.sum() / (len(hr)*1.0)
+    print 'Saved (' + str(perf) + ') ' + outfn 
 
 
 def quick_look(trials_s):

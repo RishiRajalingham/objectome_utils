@@ -202,8 +202,7 @@ def getCaffeNOBGFeatures(objects_oi, layer=8):
     meta = pk.load(open(IMGPATH + 'metadata.pkl', 'r'))
     
     if layer == 8:
-        # feature_data = np.load(IMGPATH + 'caffe_features//fc8.pkl')
-        feature_data = np.load(open(NOBGIMGPATH + 'caffe_features/obj64s100nobg_caffe_reference_model_fc8.npy'))
+        feature_data = np.load(IMGPATH + 'caffe_features/fc8.pkl')
     fid, features = [], []
     for f in feature_data:
         fid.append(f['id'])
@@ -227,11 +226,9 @@ def getCaffeNOBGFeatures(objects_oi, layer=8):
 def getVGGFeatures(objects_oi, layer=8):
     """ VGG features -- from Caffe """
     meta = pk.load(open(IMGPATH + 'metadata.pkl', 'r'))
-    # if layer == 8:
-    #     feature_data = pk.load(open(IMGPATH + 'vgg_features/fc8.pkl', 'r'))
     
     if layer == 8:
-        feature_data = np.load(IMGPATH + 'vgg_features/obj64s100_VGG_S_model_fc8.npy')
+        feature_data = pk.load(open(IMGPATH + 'vgg_features/fc8.pkl', 'r'))
     fid, features = [], []
     for f in feature_data:
         fid.append(f['id'])
@@ -265,17 +262,10 @@ def getAllFeatures(objects_oi):
     # all_features['HMAX'], all_metas['HMAX'] = getSLFFeatures_HH(objects_oi)
     # all_features['SLF'], all_metas['SLF'] = getSLFFeatures(objects_oi)
     # all_features['NYU_penult'], all_metas['NYU_penult'] = getNYUFeatures(objects_oi, layer=5)
-    all_features['NYU'], all_metas['NYU'] = getNYUFeatures(objects_oi)
-
-    # X = all_features['NYU']
-    # pca = PCA(n_components=X.shape[1])
-    # pca.fit(X)
-    # sig = pca.explained_variance_ratio_
-    # npca = np.nonzero(sig.cumsum() > 0.95)[0][0]
-    # Y = pca.transform(X)
-    # all_features['NYU_pca'] = Y[:,:npca]
-    # print all_features['NYU'].shape
-    # print all_features['NYU_pca'].shape
+    # all_features['NYU'], all_metas['NYU'] = getNYUFeatures(objects_oi)
+    all_features['VGG'], all_metas['VGG'] = getVGGFeatures(objects_oi)
+    # all_features['Caffe'], all_metas['Caffe'] = getCaffeFeatures(objects_oi)
+    # all_features['CaffeNOBG'], all_metas['CaffeNOBG'] = getCaffeNOBGFeatures(objects_oi)
 
     return all_features, all_metas
 
