@@ -15,6 +15,22 @@ STIMPATH_NOBG = '/mindhive/dicarlolab/u/rishir/stimuli/objectome64s100nobg/'
 # # cnn_oi = 'caffe_reference'
 # desired_layer = 'fc8'
 
+def save_features(features_perlayer, layer):
+    features_dict = []
+    features = features_perlayer[layer]
+    for i,m in enumerate(meta):
+        f_ = {'id':m['id'], 
+            'feature':features[i,:], 
+            'feature_layer':layer, 
+            'model_id':cnn_oi }
+        features_dict.append(f_)
+
+    # Save output
+    if os.path.exists(output_path) == False:
+        os.mkdir(output_path)
+    with open(output_path + layer + '.pkl', 'wb') as _f:
+        pk.dump(features_dict, _f)
+    print 'Saved to ' + output_path + layer
 
 def run_model(stimpath=STIMPATH, cnn_oi='VGG_S', desired_layer='fc6'):
 
@@ -73,7 +89,7 @@ def run_model(stimpath=STIMPATH, cnn_oi='VGG_S', desired_layer='fc6'):
         net.blobs['data'].data[...] = map(lambda x: transformer.preprocess('data',caffe.io.load_image(x)), images)
         out = net.forward()
         outdata = net.blobs[desired_layer].data
-        features[indices[i]:indices[i+1],:] = outdata
+        # features[indices[i]:indices[i+1],:] = outdata
 
         features_perlayer['fc6'].append(net.blobs['fc6'].data)
         features_perlayer['fc7'].append(net.blobs['fc7'].data)
@@ -85,23 +101,6 @@ def run_model(stimpath=STIMPATH, cnn_oi='VGG_S', desired_layer='fc6'):
 
     return
 
-
-    def save_features(features_perlayer, layer):
-        features_dict = []
-        features = features_perlayer[layer]
-        for i,m in enumerate(meta):
-            f_ = {'id':m['id'], 
-                'feature':features[i,:], 
-                'feature_layer':layer, 
-                'model_id':cnn_oi }
-            features_dict.append(f_)
-
-        # Save output
-        if os.path.exists(output_path) == False:
-            os.mkdir(output_path)
-        with open(output_path + layer + '.pkl', 'wb') as _f:
-            pk.dump(features_dict, _f)
-        print 'Saved to ' + output_path + layer
 
 
 
