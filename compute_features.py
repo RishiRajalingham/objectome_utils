@@ -11,11 +11,8 @@ caffe_root = '/om/user/shayo/caffe/caffe/';
 
 STIMPATH = '/mindhive/dicarlolab/u/rishir/stimuli/objectome64s100/'
 STIMPATH_NOBG = '/mindhive/dicarlolab/u/rishir/stimuli/objectome64s100nobg/'
-# cnn_oi = 'VGG_S'
-# # cnn_oi = 'caffe_reference'
-# desired_layer = 'fc8'
 
-def save_features(features_perlayer, layer):
+def save_features(features_perlayer, meta, layer, cnn_oi):
     features_dict = []
     features = features_perlayer[layer]
     for i,m in enumerate(meta):
@@ -32,7 +29,7 @@ def save_features(features_perlayer, layer):
         pk.dump(features_dict, _f)
     print 'Saved to ' + output_path + layer
 
-def run_model(stimpath=STIMPATH, cnn_oi='VGG_S', desired_layer='fc6'):
+def run_model(stimpath=STIMPATH, cnn_oi='VGG_S'):
 
     # Get image files
     meta = pk.load(open(stimpath + 'metadata.pkl'))
@@ -52,10 +49,6 @@ def run_model(stimpath=STIMPATH, cnn_oi='VGG_S', desired_layer='fc6'):
         model_file = caffe_root + 'models/VGG_CNN_S/VGG_CNN_S.caffemodel'
         model_input = '/om/user/shayo/caffe/caffe/models/VGG_CNN_S'
         output_path = stimpath + 'vgg_features/'
-    if desired_layer ==' fc8':
-        dim = 1000
-    elif desired_layer == 'fc6':
-        dim = 4096
 
     sys.path.insert(0, caffe_root + 'python')
     model_call = '/om/user/shayo/caffe/caffe/scripts/download_model_binary.py ' + model_input
@@ -80,7 +73,6 @@ def run_model(stimpath=STIMPATH, cnn_oi='VGG_S', desired_layer='fc6'):
     batchsize = 50
     net.blobs['data'].reshape(batchsize,3,input_size,input_size)
     indices = np.arange(0,1+len(filelist),batchsize)
-    # features = np.zeros([len(filelist), dim])
     features_perlayer = {'fc6':[], 'fc7':[], 'fc8':[]}
 
     for i in range(0,len(indices)-1):
@@ -88,23 +80,19 @@ def run_model(stimpath=STIMPATH, cnn_oi='VGG_S', desired_layer='fc6'):
         images = filelist[indices[i]:indices[i+1]]
         net.blobs['data'].data[...] = map(lambda x: transformer.preprocess('data',caffe.io.load_image(x)), images)
         out = net.forward()
-        outdata = net.blobs[desired_layer].data
-        # features[indices[i]:indices[i+1],:] = outdata
-
         features_perlayer['fc6'].append(net.blobs['fc6'].data)
         features_perlayer['fc7'].append(net.blobs['fc7'].data)
         features_perlayer['fc8'].append(net.blobs['fc8'].data)
  
-    save_features(features_perlayer,'fc6')
-    save_features(features_perlayer,'fc7')
-    save_features(features_perlayer,'fc8')
+    save_features(features_perlayer, meta, 'fc6', cnn_oi)
+    save_features(features_perlayer, meta, 'fc7', cnn_oi)
+    save_features(features_perlayer, meta, 'fc8', cnn_oi)
 
     return
 
+    # Main
+run_model(stimpath=STIMPATH, cnn_oi='VGG_S')
+run_model(stimpath=STIMPATH, cnn_oi='caffe_reference')
 
 
-
-# features_array = np.array(features_array)
-# np.save(output_file, features)
-# np.save(output_file+'raw', features_array)
 
