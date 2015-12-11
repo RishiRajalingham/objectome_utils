@@ -11,10 +11,11 @@ caffe_root = '/om/user/shayo/caffe/caffe/';
 
 STIMPATH = '/mindhive/dicarlolab/u/rishir/stimuli/objectome64s100/'
 STIMPATH_NOBG = '/mindhive/dicarlolab/u/rishir/stimuli/objectome64s100nobg/'
+HVMPATH = '/mindhive/dicarlolab/u/rishir/stimuli/hvm/'
 
-def save_features(features_perlayer, meta, layer, cnn_oi):
+def save_features(features_perlayer, meta, layer, cnn_oi, output_path):
     features_dict = []
-    features = features_perlayer[layer]
+    features = np.array(features_perlayer[layer])
     for i,m in enumerate(meta):
         f_ = {'id':m['id'], 
             'feature':features[i,:], 
@@ -80,19 +81,25 @@ def run_model(stimpath=STIMPATH, cnn_oi='VGG_S'):
         images = filelist[indices[i]:indices[i+1]]
         net.blobs['data'].data[...] = map(lambda x: transformer.preprocess('data',caffe.io.load_image(x)), images)
         out = net.forward()
-        features_perlayer['fc6'].append(net.blobs['fc6'].data)
-        features_perlayer['fc7'].append(net.blobs['fc7'].data)
-        features_perlayer['fc8'].append(net.blobs['fc8'].data)
- 
-    save_features(features_perlayer, meta, 'fc6', cnn_oi)
-    save_features(features_perlayer, meta, 'fc7', cnn_oi)
-    save_features(features_perlayer, meta, 'fc8', cnn_oi)
+        features_perlayer['fc6'].extend(net.blobs['fc6'].data)
+        features_perlayer['fc7'].extend(net.blobs['fc7'].data)
+        features_perlayer['fc8'].extend(net.blobs['fc8'].data)
 
-    return
+    return features_perlayer, meta, output_path
+
 
     # Main
-run_model(stimpath=STIMPATH, cnn_oi='VGG_S')
-run_model(stimpath=STIMPATH, cnn_oi='caffe_reference')
+cnn_oi = 'caffe_reference'
+features_perlayer, meta, output_path = run_model(stimpath=HVMPATH, cnn_oi=cnn_oi)
+save_features(features_perlayer, meta, 'fc6', cnn_oi, output_path)
+save_features(features_perlayer, meta, 'fc7', cnn_oi, output_path)
+save_features(features_perlayer, meta, 'fc8', cnn_oi, output_path)
+
+cnn_oi = 'VGG_S'
+features_perlayer, meta, output_path = run_model(stimpath=HVMPATH, cnn_oi=cnn_oi)
+save_features(features_perlayer, meta, 'fc6', cnn_oi, output_path)
+save_features(features_perlayer, meta, 'fc7', cnn_oi, output_path)
+save_features(features_perlayer, meta, 'fc8', cnn_oi, output_path)
 
 
 
