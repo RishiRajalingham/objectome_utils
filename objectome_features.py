@@ -175,9 +175,8 @@ def getCaffeFeatures(objects_oi, layer=8):
     """ Caffe reference model -- from Caffe """
     meta = pk.load(open(IMGPATH + 'metadata.pkl', 'r'))
     
-    if layer == 8:
-        # feature_data = np.load(IMGPATH + 'caffe_features//fc8.pkl')
-        feature_data = pk.load(open(IMGPATH + 'caffe_features/fc8.pkl', 'r'))
+    feat_fn = 'caffe_features/fc' + str(layer) + '.pkl'
+    feature_data = pk.load(open(IMGPATH + feat_fn, 'r'))
     fid, features = [], []
     for f in feature_data:
         fid.append(f['id'])
@@ -227,8 +226,8 @@ def getVGGFeatures(objects_oi, layer=8):
     """ VGG features -- from Caffe """
     meta = pk.load(open(IMGPATH + 'metadata.pkl', 'r'))
     
-    if layer == 8:
-        feature_data = pk.load(open(IMGPATH + 'vgg_features/fc8.pkl', 'r'))
+    feat_fn = 'vgg_features/fc' + str(layer) + '.pkl'
+    feature_data = pk.load(open(IMGPATH + feat_fn, 'r'))
     fid, features = [], []
     for f in feature_data:
         fid.append(f['id'])
@@ -248,7 +247,28 @@ def getVGGFeatures(objects_oi, layer=8):
     meta_ = meta[meta_ind]
     return features, meta_
 
+def getNeuralFeatures(objects_oi, area='IT'):
+    meta = pk.load(open(IMGPATH + 'metadata.pkl', 'r'))
+    feat_fn = 'neural_features/' + str(area) + '.pkl'
+    feature_data = pk.load(open(IMGPATH + feat_fn, 'r'))
+    fid, features = [], []
+    for f in feature_data:
+        fid.append(f['id'])
+        features.append(f['feature'])
 
+    features = np.array(features)
+        
+    """ fix obj field"""
+    if len(meta[0]['obj']) == 1:
+        for i,m in enumerate(meta):
+            meta[i]['obj'] = m['obj'][0]
+    meta_ind = []
+    for f in fid:
+        ind = np.array(np.nonzero(meta['id'] == f)).flatten()[0]
+        meta_ind.append(ind)
+
+    meta_ = meta[meta_ind]
+    return features, meta_
 def getAllFeatures(objects_oi):
 
     objects_oi = np.unique(objects_oi)
@@ -263,8 +283,18 @@ def getAllFeatures(objects_oi):
     # all_features['SLF'], all_metas['SLF'] = getSLFFeatures(objects_oi)
     # all_features['NYU_penult'], all_metas['NYU_penult'] = getNYUFeatures(objects_oi, layer=5)
     # all_features['NYU'], all_metas['NYU'] = getNYUFeatures(objects_oi)
-    all_features['VGG'], all_metas['VGG'] = getVGGFeatures(objects_oi)
-    # all_features['Caffe'], all_metas['Caffe'] = getCaffeFeatures(objects_oi)
+    # all_features['VGG'], all_metas['VGG'] = getVGGFeatures(objects_oi, layer=8)
+    # all_features['VGG_fc7'], all_metas['VGG_fc7'] = getVGGFeatures(objects_oi, layer=7)
+    # all_features['VGG_fc6'], all_metas['VGG_fc6'] = getVGGFeatures(objects_oi, layer=6)
+    # all_features['Caffe'], all_metas['Caffe'] = getCaffeFeatures(objects_oi, layer=8)
+    # all_features['Caffe_fc7'], all_metas['Caffe_fc7'] = getCaffeFeatures(objects_oi, layer=6)
+    # all_features['Caffe_fc6'], all_metas['Caffe_fc6'] = getCaffeFeatures(objects_oi, layer=6)
+
+    # all_features['V4'], all_metas['V4'] = getNeuralFeatures(objects_oi, area='V4')
+    # all_features['IT'], all_metas['IT'] = getNeuralFeatures(objects_oi, area='IT')
+    all_features['V4_rep'], all_metas['V4_rep'] = getNeuralFeatures(objects_oi, area='V4_rep')
+    all_features['IT_rep'], all_metas['IT_rep'] = getNeuralFeatures(objects_oi, area='IT_rep')
+
     # all_features['CaffeNOBG'], all_metas['CaffeNOBG'] = getCaffeNOBGFeatures(objects_oi)
 
     return all_features, all_metas

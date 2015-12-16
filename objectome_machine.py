@@ -94,6 +94,22 @@ def getClassifierRecord(features_task, meta_task, n_splits=1, classifiertype='sv
          'use_validation': False}
 
     return utils.compute_metric_base(features_task, meta_task, evalc, attach_models=True, return_splits=True)
+
+def sampleFeatures(features, noise_model=None, subsample=None):
+    if noise_model == None:
+        feature_sample = features
+    elif noise_model == 'poisson':
+        noise_mask = np.sign(features) * np.random.poisson(features)
+        feature_sample = features + noise_mask
+    elif noise_model == 'rep':
+        fsize = features.shape
+        assert len(fsize) == 3 #image x rep x site
+        feature_sample = np.zeros((fsize[0],fsize[2]))
+        inds = np.random.randint(0,fsize[1],fsize[0])
+        for i in range(fsize[1]):
+            feature_sample[inds == i,:] = features[inds == i,i,:]
+    return feature_sample
+
     
 def getSplitHalfPerformance(rec, meta):
     nsplits = len(rec['splits'][0])
@@ -109,9 +125,6 @@ def getSplitHalfPerformance(rec, meta):
     perf2 = np.mean(perf_img[:len(perf_img)/2])
 
     return perf1, perf2
-
-
-      
 
 
 def getSilencedPerformance(features_s, meta, rec, obj_idx=None):
@@ -227,7 +240,7 @@ def getPerformanceFromFeatures_base(features, meta, task, objects_oi=None, featu
     return performance, performance_s, trials, trials_io, trials_s
         
 
-def computePairWiseConfusions(objects_oi, OUTPATH=None, silence_mode=0):
+def computePairWiseConfusions_base(objects_oi, OUTPATH=None, silence_mode=0):
     """ For a set of objects, compute pixel and v1 features, run classifiers,
         and output trial structures for all 2x2 tasks.
     """
@@ -247,8 +260,7 @@ def computePairWiseConfusions(objects_oi, OUTPATH=None, silence_mode=0):
         all_metas = pk.load(open('quickload_feature_data/metas.pkl', 'r'))
     else:
         all_features, all_metas = obj.getAllFeatures(objs_oi)
-        # features_oi = ['VGG', 'Caffe', 'CaffeNOBG']
-        features_oi = ['VGG']
+        features_oi = ['IT', 'V4']
 
     result = {}
     
@@ -295,6 +307,51 @@ def computePairWiseConfusions(objects_oi, OUTPATH=None, silence_mode=0):
             else:
                 save_trials(trials, objs_oi, OUTPATH + feat + 'full_var_bg.mat')
                 save_trials(trials_io, objs_oi, OUTPATH + feat + 'full_var_bg_ideal_obs.mat')
+
+        result[feat] = trials
+
+    return result
+
+def computePairWiseConfusions(objects_oi, OUTPATH=None):
+    """ For a set of objects and features, run classifiers,
+        and output trial structures for all 2x2 tasks.
+    """
+    
+    if type(objects_oi) is dict:
+        objs_oi = objects_oi['objs']
+        tasks_oi = objects_oi['tasks']
+    else:
+        tasks_oi = objects_oi
+        objs_oi = objects_oi
+
+    all_features, all_metas = obj.getAllFeatures(objs_oi)
+    features_oi = ['IT_rep', 'V4_rep']
+    noise_model = 'rep'
+    nsamples_noisemodel = 10
+    nsplits = 10
+    
+    result = {}
+    for feat in features_oi:
+        print 'Running machine_objectome : ' str(feat) + '\n'
+
+        features = all_features[feat]
+        meta = all_metas[feat]
+        tasks = getBinaryTasks(meta, tasks_oi)
+        trials, trials_io = [], []
+
+        for isample in range(nsamples_noisemodel):
+            features_sample = sampleFeatures(features, noise_model)
+            for task in tasks:
+                p_, p_s_, t_, t_io_, t_s_ = getPerformanceFromFeatures_base(features_sample, meta, task, objs_oi, features_s=None, nsplits=nsplits)
+                trials.extend(t_)
+                trials_io.extend(t_io_)
+        trials = format_trials_var(trials)
+        trials_io = format_trials_var(trials_io)
+        if OUTPATH != None:
+            if not os.path.exists(OUTPATH):
+                os.makedirs(OUTPATH)
+            save_trials(trials, objs_oi, OUTPATH + feat + 'full_var_bg.mat')
+            save_trials(trials_io, objs_oi, OUTPATH + feat + 'full_var_bg_ideal_obs.mat')
 
         result[feat] = trials
 
