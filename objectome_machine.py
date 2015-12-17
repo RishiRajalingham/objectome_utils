@@ -108,6 +108,11 @@ def sampleFeatures(features, noise_model=None, subsample=None):
         inds = np.random.randint(0,fsize[1],fsize[0])
         for i in range(fsize[1]):
             feature_sample[inds == i,:] = features[inds == i,i,:]
+
+    if subsample != None:
+        nunits = range(feature_sample.shape[1])
+        np.random.shuffle(nunits)
+        feature_sample = feature_sample[:,nunits[:subsample]]
     return feature_sample
 
     
@@ -327,12 +332,13 @@ def computePairWiseConfusions(objects_oi, OUTPATH=None):
     all_features, all_metas = obj.getAllFeatures(objs_oi)
     features_oi = ['IT_rep', 'V4_rep']
     noise_model = 'rep'
-    nsamples_noisemodel = 10
-    nsplits = 10
+    subsample = None
+    nsamples_noisemodel = 20
+    nsplits = 5
     
     result = {}
     for feat in features_oi:
-        print 'Running machine_objectome : ' str(feat) + '\n'
+        print 'Running machine_objectome : ' + str(feat) + '\n'
 
         features = all_features[feat]
         meta = all_metas[feat]
@@ -340,7 +346,7 @@ def computePairWiseConfusions(objects_oi, OUTPATH=None):
         trials, trials_io = [], []
 
         for isample in range(nsamples_noisemodel):
-            features_sample = sampleFeatures(features, noise_model)
+            features_sample = sampleFeatures(features, noise_model, subsample)
             for task in tasks:
                 p_, p_s_, t_, t_io_, t_s_ = getPerformanceFromFeatures_base(features_sample, meta, task, objs_oi, features_s=None, nsplits=nsplits)
                 trials.extend(t_)
@@ -350,6 +356,8 @@ def computePairWiseConfusions(objects_oi, OUTPATH=None):
         if OUTPATH != None:
             if not os.path.exists(OUTPATH):
                 os.makedirs(OUTPATH)
+            if subsample != None:
+                feat = feat + '_' + str(subsample)
             save_trials(trials, objs_oi, OUTPATH + feat + 'full_var_bg.mat')
             save_trials(trials_io, objs_oi, OUTPATH + feat + 'full_var_bg_ideal_obs.mat')
 

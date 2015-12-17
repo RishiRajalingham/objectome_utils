@@ -247,9 +247,18 @@ def getVGGFeatures(objects_oi, layer=8):
     meta_ = meta[meta_ind]
     return features, meta_
 
-def getNeuralFeatures(objects_oi, area='IT'):
+def getNeuralFeatures(objects_oi, area='IT', stim='hh'):
     meta = pk.load(open(IMGPATH + 'metadata.pkl', 'r'))
-    feat_fn = 'neural_features/' + str(area) + '.pkl'
+    if stim == 'hh':
+        feat_fn = 'neural_features/rawdat/hh/' + str(area) + '.pkl'
+    elif stim == 'ds':
+        feat_fn = 'neural_features/rawdat/ds/' + str(area) + '.pkl'
+    elif stim == 'all':
+        f1, m1 = getNeuralFeatures(objects_oi, area=area, stim='hh')
+        f2, m2 = getNeuralFeatures(objects_oi, area=area, stim='ds')
+        f = np.concatenate((f1, f2), axis=len(f1.shape)-1)
+        return f, m1
+
     feature_data = pk.load(open(IMGPATH + feat_fn, 'r'))
     fid, features = [], []
     for f in feature_data:
@@ -269,6 +278,8 @@ def getNeuralFeatures(objects_oi, area='IT'):
 
     meta_ = meta[meta_ind]
     return features, meta_
+
+
 def getAllFeatures(objects_oi):
 
     objects_oi = np.unique(objects_oi)
@@ -293,7 +304,7 @@ def getAllFeatures(objects_oi):
     # all_features['V4'], all_metas['V4'] = getNeuralFeatures(objects_oi, area='V4')
     # all_features['IT'], all_metas['IT'] = getNeuralFeatures(objects_oi, area='IT')
     all_features['V4_rep'], all_metas['V4_rep'] = getNeuralFeatures(objects_oi, area='V4_rep')
-    all_features['IT_rep'], all_metas['IT_rep'] = getNeuralFeatures(objects_oi, area='IT_rep')
+    all_features['IT_rep'], all_metas['IT_rep'] = getNeuralFeatures(objects_oi, area='IT_rep', stim='all')
 
     # all_features['CaffeNOBG'], all_metas['CaffeNOBG'] = getCaffeNOBGFeatures(objects_oi)
 
