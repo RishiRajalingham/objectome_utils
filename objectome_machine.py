@@ -52,7 +52,7 @@ def getBinaryTasks(meta, objects_oi):
     else:
         return getBinaryTasks_pair(meta, objects_oi)
         
-def getClassifierRecord(features_task, meta_task, n_splits=1, classifiertype='svm'):
+def getClassifierRecord(features_task, meta_task, n_splits=2, classifiertype='svm'):
     if len(meta_task) == 1:
         meta_task = meta_task[0]
     features_task = np.squeeze(features_task)
@@ -209,7 +209,7 @@ def format_trials_var(trials):
         trials = np.array(trials).astype('double')
         return trials
 
-def getPerformanceFromFeatures_base(features, meta, task, objects_oi=None, features_s=None, nsplits=1):
+def getPerformanceFromFeatures_base(features, meta, task, objects_oi=None, features_s=None, nsplits=2):
 
     features_task = np.squeeze(features[task,:])
     
@@ -330,25 +330,28 @@ def computePairWiseConfusions(objects_oi, OUTPATH=None):
         objs_oi = objects_oi
 
     all_features, all_metas = obj.getAllFeatures(objs_oi)
-    features_oi = ['IT_rep', 'V4_rep']
-    noise_model = 'rep'
-    subsample = None
-    nsamples_noisemodel = 20
-    nsplits = 5
+    features_oi = ['IT_rep', 'IT']
     
+    subsample = None
+    nsamples_noisemodel = 25
     result = {}
+
     for feat in features_oi:
-        print 'Running machine_objectome : ' + str(feat) + '\n'
 
         features = all_features[feat]
         meta = all_metas[feat]
         tasks = getBinaryTasks(meta, tasks_oi)
         trials, trials_io = [], []
+        if 'rep' in feat:
+            noise_model = 'rep' #'rep'
+        else:
+            noise_model = None
 
+        print 'Running machine_objectome : ' + str(feat) + ': ' + str(features.shape) + '\n'
         for isample in range(nsamples_noisemodel):
             features_sample = sampleFeatures(features, noise_model, subsample)
             for task in tasks:
-                p_, p_s_, t_, t_io_, t_s_ = getPerformanceFromFeatures_base(features_sample, meta, task, objs_oi, features_s=None, nsplits=nsplits)
+                p_, p_s_, t_, t_io_, t_s_ = getPerformanceFromFeatures_base(features_sample, meta, task, objs_oi)
                 trials.extend(t_)
                 trials_io.extend(t_io_)
         trials = format_trials_var(trials)
@@ -420,7 +423,7 @@ def run_machine_objectome(block_num=0):
     
 
     OUTPATH = HOMEPATH + IMGBLOCK + 'output/' 
-    print 'Objectome-machine for block ' + str(block_num) + ':' + IMGBLOCK
+    print 'Objectome-machine for block ' + str(block_num) + ' : ' + IMGBLOCK
     res = computePairWiseConfusions(objects_oi, OUTPATH)
 
 def run_screens():

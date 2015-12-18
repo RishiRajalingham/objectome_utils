@@ -302,8 +302,8 @@ def getAllFeatures(objects_oi):
     # all_features['Caffe_fc6'], all_metas['Caffe_fc6'] = getCaffeFeatures(objects_oi, layer=6)
 
     # all_features['V4'], all_metas['V4'] = getNeuralFeatures(objects_oi, area='V4')
-    # all_features['IT'], all_metas['IT'] = getNeuralFeatures(objects_oi, area='IT')
-    all_features['V4_rep'], all_metas['V4_rep'] = getNeuralFeatures(objects_oi, area='V4_rep')
+    all_features['IT'], all_metas['IT'] = getNeuralFeatures(objects_oi, area='IT', stim='all')
+    # all_features['V4_rep'], all_metas['V4_rep'] = getNeuralFeatures(objects_oi, area='V4_rep')
     all_features['IT_rep'], all_metas['IT_rep'] = getNeuralFeatures(objects_oi, area='IT_rep', stim='all')
 
     # all_features['CaffeNOBG'], all_metas['CaffeNOBG'] = getCaffeNOBGFeatures(objects_oi)
