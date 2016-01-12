@@ -4,10 +4,11 @@ import numpy as np
 import skdata.larray as larray
 from dldata.stimulus_sets.hvm import ImgLoaderResizer
 
-
 IMGPATH = '/mindhive/dicarlolab/u/rishir/stimuli/objectome64s100/'
 NOBGIMGPATH = '/mindhive/dicarlolab/u/rishir/stimuli/objectome64s100nobg'
-HOMEPATH = '/mindhive/dicarlolab/u/rishir/monkey_objectome/machine_behaviour/'
+
+IMGPATH = '/mindhive/dicarlolab/u/rishir/stimuli/hvm/'
+
 
 def getPixelFeatures(objects_oi, normalize_on=False):
     """ compute pixel features on images of objects of interest """
@@ -296,15 +297,15 @@ def getAllFeatures(objects_oi):
     # all_features['NYU'], all_metas['NYU'] = getNYUFeatures(objects_oi)
     # all_features['VGG'], all_metas['VGG'] = getVGGFeatures(objects_oi, layer=8)
     # all_features['VGG_fc7'], all_metas['VGG_fc7'] = getVGGFeatures(objects_oi, layer=7)
-    # all_features['VGG_fc6'], all_metas['VGG_fc6'] = getVGGFeatures(objects_oi, layer=6)
+    all_features['VGG_fc6'], all_metas['VGG_fc6'] = getVGGFeatures(objects_oi, layer=6)
     # all_features['Caffe'], all_metas['Caffe'] = getCaffeFeatures(objects_oi, layer=8)
     # all_features['Caffe_fc7'], all_metas['Caffe_fc7'] = getCaffeFeatures(objects_oi, layer=6)
     # all_features['Caffe_fc6'], all_metas['Caffe_fc6'] = getCaffeFeatures(objects_oi, layer=6)
 
-    # all_features['V4'], all_metas['V4'] = getNeuralFeatures(objects_oi, area='V4')
-    all_features['IT'], all_metas['IT'] = getNeuralFeatures(objects_oi, area='IT', stim='all')
+    all_features['V4'], all_metas['V4'] = getNeuralFeatures(objects_oi, area='V4')
+    all_features['IT'], all_metas['IT'] = getNeuralFeatures(objects_oi, area='IT')
     # all_features['V4_rep'], all_metas['V4_rep'] = getNeuralFeatures(objects_oi, area='V4_rep')
-    all_features['IT_rep'], all_metas['IT_rep'] = getNeuralFeatures(objects_oi, area='IT_rep', stim='all')
+    # all_features['IT_rep'], all_metas['IT_rep'] = getNeuralFeatures(objects_oi, area='IT_rep', stim='all')
 
     # all_features['CaffeNOBG'], all_metas['CaffeNOBG'] = getCaffeNOBGFeatures(objects_oi)
 

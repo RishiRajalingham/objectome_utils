@@ -86,6 +86,10 @@ import numpy as np
 MWKIMGINDEX_PATH = '/mindhive/dicarlolab/u/rishir/Manto/Images/obj24s100/'
 obj24images = list(pk.load(open(MWKIMGINDEX_PATH + 'images24.pkl' ,'r')))
 
+
+MWKIMGINDEX_PATH_HVM = '/mindhive/dicarlolab/u/rishir/stimuli_mwk/hvm10_test/'
+hvm10images = pk.load(open(MWKIMGINDEX_PATH_HVM + 'images_dict.pkl' ,'r'))
+
 def get_obj_indices(models):
 	inds = []
 	for m in models:
@@ -101,8 +105,13 @@ def strip_objectomeFileName(fn):
 def get_index_MWorksRelative(img_id):
     if img_id in obj24images:
         return obj24images.index(img_id)+1
+    elif img_id in hvm10images.keys():
+        return hvm10images[img_id]+1
     else:
         return np.nan
+
+def get_index_MWorksRelative_HVM(img_id):
+    return hvm10images[img_id]
 
 def get_hvm_3dmodelnames(models_hvm):
     HVM_models_v2 = []

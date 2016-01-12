@@ -10,9 +10,9 @@ import scipy.io as io
 
 caffe_root = '/om/user/shayo/caffe/caffe/';
 
-STIMPATH = '/mindhive/dicarlolab/u/rishir/stimuli/objectome64s100/'
+#STIMPATH = '/mindhive/dicarlolab/u/rishir/stimuli/objectome64s100/'
 STIMPATH_NOBG = '/mindhive/dicarlolab/u/rishir/stimuli/objectome64s100nobg/'
-HVMPATH = '/mindhive/dicarlolab/u/rishir/stimuli/hvm/'
+STIMPATH = '/mindhive/dicarlolab/u/rishir/stimuli/hvm/'
 
 BATCHSIZE = 40
 MAXNSTIM = 1000000000

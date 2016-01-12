@@ -326,14 +326,14 @@ def computePairWiseConfusions(objects_oi, OUTPATH=None):
         objs_oi = objects_oi['objs']
         tasks_oi = objects_oi['tasks']
     else:
-        tasks_oi = objects_oi
-        objs_oi = objects_oi
+        tasks_oi = np.array(objects_oi)
+        objs_oi = np.array(objects_oi)
 
     all_features, all_metas = obj.getAllFeatures(objs_oi)
-    features_oi = ['IT_rep', 'IT']
+    features_oi = ['IT', 'V4']
     
     subsample = None
-    nsamples_noisemodel = 25
+    nsamples_noisemodel = 20
     result = {}
 
     for feat in features_oi:
@@ -347,13 +347,15 @@ def computePairWiseConfusions(objects_oi, OUTPATH=None):
         else:
             noise_model = None
 
-        print 'Running machine_objectome : ' + str(feat) + ': ' + str(features.shape) + '\n'
+        print 'Running machine_objectome : ' + str(feat) + ': ' + str(features.shape) + '\t' + str(noise_model) + '\n'
         for isample in range(nsamples_noisemodel):
             features_sample = sampleFeatures(features, noise_model, subsample)
+	    print 'sampled \n'
             for task in tasks:
                 p_, p_s_, t_, t_io_, t_s_ = getPerformanceFromFeatures_base(features_sample, meta, task, objs_oi)
-                trials.extend(t_)
+		trials.extend(t_)
                 trials_io.extend(t_io_)
+	
         trials = format_trials_var(trials)
         trials_io = format_trials_var(trials_io)
         if OUTPATH != None:
@@ -361,7 +363,9 @@ def computePairWiseConfusions(objects_oi, OUTPATH=None):
                 os.makedirs(OUTPATH)
             if subsample != None:
                 feat = feat + '_' + str(subsample)
-            save_trials(trials, objs_oi, OUTPATH + feat + 'full_var_bg.mat')
+            else:
+		feat = feat 
+	    save_trials(trials, objs_oi, OUTPATH + feat + 'full_var_bg.mat')
             save_trials(trials_io, objs_oi, OUTPATH + feat + 'full_var_bg_ideal_obs.mat')
 
         result[feat] = trials
