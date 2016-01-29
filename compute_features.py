@@ -5,6 +5,7 @@ import sys
 import os
 import matplotlib.pyplot as plt
 import scipy.io as io
+import random
 
 """ This is a slightly edited version of Shay's OM script."""
 
@@ -17,7 +18,7 @@ STIMPATH = '/mindhive/dicarlolab/u/rishir/stimuli/hvm/'
 BATCHSIZE = 40
 MAXNSTIM = 1000000000
 
-def save_features(features_perlayer, meta, cnn_oi, output_path):
+def save_features(features_perlayer, meta, cnn_oi, output_path, repindex):
     layers = features_perlayer.keys()
     for layer in layers:
         features_dict = []
@@ -32,9 +33,9 @@ def save_features(features_perlayer, meta, cnn_oi, output_path):
         # Save output
         if os.path.exists(output_path) == False:
             os.mkdir(output_path)
-        with open(output_path + layer + '.pkl', 'wb') as _f:
+        with open(output_path + 'reps/' + layer + '_' + str(repindex) + '.pkl', 'wb') as _f:
             pk.dump(features_dict, _f)
-        io.savemat(output_path + layer + '.mat', {'features':features})
+        io.savemat(output_path + 'reps/' + layer + '_' + str(repindex) + '.mat', {'features':features})
         print 'Saved to ' + output_path + layer
     return
 
@@ -78,6 +79,20 @@ def get_net(stimpath=STIMPATH, cnn_oi='VGG_S'):
     return net, transformer, output_path
 
 
+def translate_images(images):
+    images_shifted = []
+    nimages = len(images)
+    for i in range(nimages):
+        im = images[i]
+        imsize = im.shape
+        maxshift = imsize[2]/8
+        shift_x = random.randint(-maxshift, maxshift)
+        shift_y = random.randint(-maxshift, maxshift)
+        im = np.roll(im, shift_x, axis=1)
+        im = np.roll(im, shift_y, axis=2)
+        images_shifted.append(im)
+    return images_shifted
+
 def run_model(stimpath=STIMPATH, cnn_oi='VGG_S'):
 
     # Get image files
@@ -100,7 +115,8 @@ def run_model(stimpath=STIMPATH, cnn_oi='VGG_S'):
     for i in range(0,len(indices)-1):
         print "Processing "+str(indices[i])+" to "+ str(indices[i+1])
         images = filelist[indices[i]:indices[i+1]]
-        net.blobs['data'].data[...] = map(lambda x: transformer.preprocess('data',caffe.io.load_image(x)), images)
+        image_data_batch = map(lambda x: transformer.preprocess('data',caffe.io.load_image(x)), images)
+        net.blobs['data'].data[...] = translate_images(image_data_batch)
         out = net.forward()
         for layer in compute_layers:
             outdata = net.blobs[layer].data
@@ -108,12 +124,32 @@ def run_model(stimpath=STIMPATH, cnn_oi='VGG_S'):
         
     return features_perlayer, meta, output_path
 
+def format_features(stimpath=STIMPATH, nreps=9):
+    meta = pk.load(open(stimpath + 'metadata.pkl'))
+    output_path = stimpath + 'caffe_features/'
+    nstim = len(meta)
+    compute_layers = {'fc6', 'fc7', 'fc8'}
+    layer_dim = {'fc6':4096, 'fc7':4096, 'fc8':1000}
 
-#     # Main
-cnn_oi = 'caffe_reference'
-features_perlayer, meta, output_path = run_model(stimpath=STIMPATH, cnn_oi=cnn_oi)
-save_features(features_perlayer, meta, cnn_oi, output_path)
+    for layer in compute_layers:
+        features = np.zeros((nstim,0,layer_dim[layer]))
+        for repindex in range(nreps):
+            outfn = output_path + 'reps/' + layer + '_' + str(repindex) + '.pkl'
+            dat = pk.load(open(outfn))
+            rep_dat = np.array([imdat['feature'] for imdat in dat])
+            s = rep_dat.shape
+            rep_dat = rep_dat.reshape((s[0],1,s[1]))
+            features = np.concatenate((features, rep_dat), axis=1)
+        with open(output_path + layer + '.pkl', 'wb') as _f:
+            pk.dump(features, _f)
 
-cnn_oi = 'VGG_S'
-features_perlayer, meta, output_path = run_model(stimpath=STIMPATH, cnn_oi=cnn_oi)
-save_features(features_perlayer, meta, cnn_oi, output_path)
+    # Main
+
+# for rep in range(9):
+#     cnn_oi = 'caffe_reference'
+#     features_perlayer, meta, output_path = run_model(stimpath=STIMPATH, cnn_oi=cnn_oi)
+#     save_features(features_perlayer, meta, cnn_oi, output_path, rep)
+
+#     cnn_oi = 'VGG_S'
+#     features_perlayer, meta, output_path = run_model(stimpath=STIMPATH, cnn_oi=cnn_oi)
+#     save_features(features_perlayer, meta, cnn_oi, output_path, rep)

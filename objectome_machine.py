@@ -193,6 +193,19 @@ def getTrialsFromRecord(rec, meta, obj_idx):
 
     return trials, trials_io
 
+def getBehavioralPatternFromRecord(rec, meta):
+    nsplits = len(rec['splits'][0])
+    labelset = rec['result_summary']['labelset']
+    trials =  []
+    for i in range(nsplits):
+        split_ind = rec['splits'][0][i]['test']
+        pred_labels = np.array(rec['split_results'][i]['test_prediction'])
+        actual_labels = meta[split_ind]['obj']
+        nonmatch_labels = [np.setdiff1d(labelset,pl) for pl in actual_labels]
+        image_fns = meta[split_ind]['id']
+
+
+    return trials
 
 def format_trials_var(trials):
     if (trials == None) | (trials == []):
@@ -330,7 +343,7 @@ def computePairWiseConfusions(objects_oi, OUTPATH=None):
         objs_oi = np.array(objects_oi)
 
     all_features, all_metas = obj.getAllFeatures(objs_oi)
-    features_oi = ['IT', 'V4']
+    features_oi = ['VGG', 'VGG_fc7', 'Caffe', 'Caffe_fc6', 'Caffe_fc7']
     
     subsample = None
     nsamples_noisemodel = 20
@@ -350,7 +363,6 @@ def computePairWiseConfusions(objects_oi, OUTPATH=None):
         print 'Running machine_objectome : ' + str(feat) + ': ' + str(features.shape) + '\t' + str(noise_model) + '\n'
         for isample in range(nsamples_noisemodel):
             features_sample = sampleFeatures(features, noise_model, subsample)
-	    print 'sampled \n'
             for task in tasks:
                 p_, p_s_, t_, t_io_, t_s_ = getPerformanceFromFeatures_base(features_sample, meta, task, objs_oi)
 		trials.extend(t_)
@@ -363,8 +375,6 @@ def computePairWiseConfusions(objects_oi, OUTPATH=None):
                 os.makedirs(OUTPATH)
             if subsample != None:
                 feat = feat + '_' + str(subsample)
-            else:
-		feat = feat 
 	    save_trials(trials, objs_oi, OUTPATH + feat + 'full_var_bg.mat')
             save_trials(trials_io, objs_oi, OUTPATH + feat + 'full_var_bg_ideal_obs.mat')
 
