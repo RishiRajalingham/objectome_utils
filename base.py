@@ -78,7 +78,57 @@ HVM_10 = [ 'bear', 'ELEPHANT_M', '_18', 'face0001', 'alfa155', 'breed_pug', 'TUR
 #bear, elephant, table, face, 
 #HVM new (6): car, dog, turtle, apple, chair, plane 
 
+""" Load metadata for different imagesets """
+def hvm_meta():
+    return pk.load(open('/mindhive/dicarlolab/u/rishir/stimuli/hvm/metadata.pkl', 'r'))
+
+def hvm_stimpath():
+    return '/mindhive/dicarlolab/u/rishir/stimuli/hvm/'
+    
+def objectome_meta():
+    return pk.load(open('/mindhive/dicarlolab/u/rishir/stimuli/objectome64s100/metadata.pkl', 'r'))
+
+def objectome_stimpath():
+    return '/mindhive/dicarlolab/u/rishir/stimuli/objectome64s100/'
+
 """ Utilities relating to objectome objects"""
+
+
+CANONICAL_ANGLES_obj24 = {
+    ('flarenut_spanner'):           {'rxy':0,   'rxz':0,   'ryz':90},
+    ('lo_poly_animal_RHINO_2',
+     'womens_stockings_01M',
+     'lo_poly_animal_CHICKDEE',
+     'lo_poly_animal_ELE_AS1',
+     'build51',
+     'lo_poly_animal_TRANTULA'):    {'rxy':0,   'rxz':90,   'ryz':270},
+    ('22_acoustic_guitar', 
+     'lo_poly_animal_BEAR_BLK', 
+     'antique_furniture_item_18'):  {'rxy':0,   'rxz':90,   'ryz':180},
+    ('MB30203'):                    {'rxy':0,   'rxz':90,   'ryz':90},
+    ('dromedary',
+     'MB30758', 
+     'zebra', 
+     'weimaraner', 
+     'MB29874', 
+     'MB27346'):                    {'rxy':90,  'rxz':0,    'ryz':180},
+    ('womens_shorts_01M',
+     'Hanger_02'):                  {'rxy':0,   'rxz':90,   'ryz':180},
+    ('interior_details_103_4', 
+     'kitchen_equipment_knife2'):   {'rxy':0,   'rxz':180,  'ryz':0},
+    ('interior_details_130_2'):     {'rxy':180, 'rxz':0,    'ryz':270},
+    ('calc01'):                     {'rxy':0,   'rxz':0,    'ryz':0},
+    ('MB28699'):                    {'rxy':180, 'rxz':270,  'ryz':270},
+}
+
+def get_canonical_angle(objn):
+    canonkeys = CANONICAL_ANGLES_obj24.keys()
+    angles = [CANONICAL_ANGLES_obj24[cobj] for cobj in canonkeys if objn in cobj]
+    if len(angles) == 0:
+        return {'rxy':0, 'ryz':0, 'rxz':0}
+    else:
+        return angles[0]
+
 
 import cPickle as pk
 import numpy as np

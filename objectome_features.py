@@ -4,10 +4,14 @@ import numpy as np
 import skdata.larray as larray
 from dldata.stimulus_sets.hvm import ImgLoaderResizer
 
-IMGPATH = '/mindhive/dicarlolab/u/rishir/stimuli/objectome64s100/'
-NOBGIMGPATH = '/mindhive/dicarlolab/u/rishir/stimuli/objectome64s100nobg'
 
-IMGPATH = '/mindhive/dicarlolab/u/rishir/stimuli/hvm/'
+STIMPATH_HVM = '/mindhive/dicarlolab/u/rishir/stimuli/hvm/'
+STIMPATH_HVMRET = '/mindhive/dicarlolab/u/rishir/stimuli/hvmret/'
+STIMPATH_OBJ = '/mindhive/dicarlolab/u/rishir/stimuli/objectome64s100/'
+STIMPATH_OBJNOBG = '/mindhive/dicarlolab/u/rishir/stimuli/objectome64s100nobg/'
+STIMPATH_OBJRET = '/mindhive/dicarlolab/u/rishir/stimuli/objectome64s100ret/'
+
+IMGPATH = STIMPATH_HVMRET
 
 
 def getPixelFeatures(objects_oi, normalize_on=False):
@@ -248,6 +252,21 @@ def getVGGFeatures(objects_oi, layer=8):
     meta_ = meta[meta_ind]
     return features, meta_
 
+def getHyoFeatures(objects_oi, layer=8):
+    """ Alexnet features with synthetic+imgnet training -- from Hyo  """
+    meta = pk.load(open(IMGPATH + 'metadata.pkl', 'r'))
+    
+    feat_fn = 'alexnet_hyo/fcx.pkl'
+    features = pk.load(open(IMGPATH + feat_fn, 'r'))
+    features = np.array(features)
+        
+    """ fix obj field"""
+    if len(meta[0]['obj']) == 1:
+        for i,m in enumerate(meta):
+            meta[i]['obj'] = m['obj'][0]
+
+    return features, meta
+
 def getNeuralFeatures(objects_oi, area='IT', stim='hh'):
     meta = pk.load(open(IMGPATH + 'metadata.pkl', 'r'))
     if stim == 'hh':
@@ -286,6 +305,8 @@ def getAllFeatures(objects_oi):
     objects_oi = np.unique(objects_oi)
     all_features = {}
     all_metas = {}
+
+    print  'Loading from ... ' +  IMGPATH 
     
     # all_features['PXL'], all_metas['PXL'] = getPixelFeatures(objects_oi, normalize_on=False)
     # all_features['PXLn'], all_metas['PXLn'] = getPixelFeatures(objects_oi, normalize_on=True)
@@ -295,12 +316,16 @@ def getAllFeatures(objects_oi):
     # all_features['SLF'], all_metas['SLF'] = getSLFFeatures(objects_oi)
     # all_features['NYU_penult'], all_metas['NYU_penult'] = getNYUFeatures(objects_oi, layer=5)
     # all_features['NYU'], all_metas['NYU'] = getNYUFeatures(objects_oi)
-    all_features['VGG'], all_metas['VGG'] = getVGGFeatures(objects_oi, layer=8)
-    all_features['VGG_fc7'], all_metas['VGG_fc7'] = getVGGFeatures(objects_oi, layer=7)
+
     all_features['VGG_fc6'], all_metas['VGG_fc6'] = getVGGFeatures(objects_oi, layer=6)
-    all_features['Caffe'], all_metas['Caffe'] = getCaffeFeatures(objects_oi, layer=8)
-    all_features['Caffe_fc7'], all_metas['Caffe_fc7'] = getCaffeFeatures(objects_oi, layer=6)
+    all_features['VGG_fc7'], all_metas['VGG_fc7'] = getVGGFeatures(objects_oi, layer=7)
+    all_features['VGG'], all_metas['VGG'] = getVGGFeatures(objects_oi, layer=8)
+    
     all_features['Caffe_fc6'], all_metas['Caffe_fc6'] = getCaffeFeatures(objects_oi, layer=6)
+    all_features['Caffe_fc7'], all_metas['Caffe_fc7'] = getCaffeFeatures(objects_oi, layer=7)
+    all_features['Caffe'], all_metas['Caffe'] = getCaffeFeatures(objects_oi, layer=8)
+    
+    #all_features['AlexnetHyo'], all_metas['AlexnetHyo'] = getHyoFeatures(objects_oi, layer=8)
 
     # all_features['V4'], all_metas['V4'] = getNeuralFeatures(objects_oi, area='V4')
     # all_features['IT'], all_metas['IT'] = getNeuralFeatures(objects_oi, area='IT')
@@ -310,5 +335,10 @@ def getAllFeatures(objects_oi):
     # all_features['CaffeNOBG'], all_metas['CaffeNOBG'] = getCaffeNOBGFeatures(objects_oi)
 
     return all_features, all_metas
+
+# def get_RDMs(features, meta):
+    
+#     for i,m in enumerate(meta):
+
 
     

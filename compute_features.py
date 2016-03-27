@@ -7,18 +7,21 @@ import matplotlib.pyplot as plt
 import scipy.io as io
 import random
 
-""" This is a slightly edited version of Shay's OM script."""
+""" This is a slightly edited version of Shay's OM script. - rishir"""
 
 caffe_root = '/om/user/shayo/caffe/caffe/';
+use_microsaccades = False
 
-#STIMPATH = '/mindhive/dicarlolab/u/rishir/stimuli/objectome64s100/'
-STIMPATH_NOBG = '/mindhive/dicarlolab/u/rishir/stimuli/objectome64s100nobg/'
-STIMPATH = '/mindhive/dicarlolab/u/rishir/stimuli/hvm/'
+STIMPATH_HVM = '/mindhive/dicarlolab/u/rishir/stimuli/hvm/'
+STIMPATH_HVMRET = '/mindhive/dicarlolab/u/rishir/stimuli/hvmret/'
+STIMPATH_OBJ = '/mindhive/dicarlolab/u/rishir/stimuli/objectome64s100/'
+STIMPATH_OBJNOBG = '/mindhive/dicarlolab/u/rishir/stimuli/objectome64s100nobg/'
+STIMPATH_OBJRET = '/mindhive/dicarlolab/u/rishir/stimuli/objectome64s100ret/'
 
 BATCHSIZE = 40
 MAXNSTIM = 1000000000
 
-def save_features(features_perlayer, meta, cnn_oi, output_path, repindex):
+def save_features(features_perlayer, meta, cnn_oi, output_path, repindex=None):
     layers = features_perlayer.keys()
     for layer in layers:
         features_dict = []
@@ -31,15 +34,20 @@ def save_features(features_perlayer, meta, cnn_oi, output_path, repindex):
             features_dict.append(f_)
 
         # Save output
+        if repindex == None:
+            outfn = output_path + layer + '.pkl'
+        else:
+            outfn = output_path + 'reps/' + layer + '_' + str(repindex) + '.pkl'
+
         if os.path.exists(output_path) == False:
             os.mkdir(output_path)
-        with open(output_path + 'reps/' + layer + '_' + str(repindex) + '.pkl', 'wb') as _f:
-            pk.dump(features_dict, _f)
-        io.savemat(output_path + 'reps/' + layer + '_' + str(repindex) + '.mat', {'features':features})
-        print 'Saved to ' + output_path + layer
+        with open(outfn, 'wb') as _f:
+            pk.dump(features_dict, _f)  
+        # io.savemat(, {'features':features})
+        print 'Saved to ' + outfn
     return
 
-def get_net(stimpath=STIMPATH, cnn_oi='VGG_S'):
+def get_net(stimpath, cnn_oi='VGG_S'):
     if cnn_oi == 'caffe_reference':
         input_size = 227
         proto_file = caffe_root + 'models/bvlc_reference_caffenet/deploy.prototxt'
@@ -93,7 +101,7 @@ def translate_images(images):
         images_shifted.append(im)
     return images_shifted
 
-def run_model(stimpath=STIMPATH, cnn_oi='VGG_S'):
+def run_model(stimpath, cnn_oi='VGG_S'):
 
     # Get image files
     meta = pk.load(open(stimpath + 'metadata.pkl'))
@@ -102,7 +110,7 @@ def run_model(stimpath=STIMPATH, cnn_oi='VGG_S'):
     nstim = len(filelist)
     print("There are "+str(nstim)+ " files")
     
-    net, transformer, output_path = get_net(STIMPATH, cnn_oi)
+    net, transformer, output_path = get_net(stimpath, cnn_oi)
     compute_layers = {'fc6', 'fc7', 'fc8'}
     layer_dim = {'fc6':4096, 'fc7':4096, 'fc8':1000}
     
@@ -116,7 +124,10 @@ def run_model(stimpath=STIMPATH, cnn_oi='VGG_S'):
         print "Processing "+str(indices[i])+" to "+ str(indices[i+1])
         images = filelist[indices[i]:indices[i+1]]
         image_data_batch = map(lambda x: transformer.preprocess('data',caffe.io.load_image(x)), images)
-        net.blobs['data'].data[...] = translate_images(image_data_batch)
+        if use_microsaccades:
+            net.blobs['data'].data[...] = translate_images(image_data_batch)
+        else:
+            net.blobs['data'].data[...] = image_data_batch
         out = net.forward()
         for layer in compute_layers:
             outdata = net.blobs[layer].data
@@ -124,24 +135,29 @@ def run_model(stimpath=STIMPATH, cnn_oi='VGG_S'):
         
     return features_perlayer, meta, output_path
 
-def format_features(stimpath=STIMPATH, nreps=9):
+def format_features(stimpath, nreps=9):
     meta = pk.load(open(stimpath + 'metadata.pkl'))
     output_path = stimpath + 'caffe_features/'
     nstim = len(meta)
-    compute_layers = {'fc6', 'fc7', 'fc8'}
+    compute_layers = ['fc6', 'fc7', 'fc8']
     layer_dim = {'fc6':4096, 'fc7':4096, 'fc8':1000}
 
     for layer in compute_layers:
         features = np.zeros((nstim,0,layer_dim[layer]))
+        print layer + ' ... '
         for repindex in range(nreps):
             outfn = output_path + 'reps/' + layer + '_' + str(repindex) + '.pkl'
-            dat = pk.load(open(outfn))
+            with open(outfn, 'r') as _f:
+                dat = pk.load(_f)
             rep_dat = np.array([imdat['feature'] for imdat in dat])
             s = rep_dat.shape
             rep_dat = rep_dat.reshape((s[0],1,s[1]))
+            print '...' + str(repindex)
             features = np.concatenate((features, rep_dat), axis=1)
-        with open(output_path + layer + '.pkl', 'wb') as _f:
-            pk.dump(features, _f)
+        print features.shape
+        np.save(output_path + layer + '.npy', features)
+        # with open(output_path + layer + '.pkl', 'wb') as _f:
+            # pk.dump(features, _f)
 
     # Main
 
@@ -153,3 +169,12 @@ def format_features(stimpath=STIMPATH, nreps=9):
 #     cnn_oi = 'VGG_S'
 #     features_perlayer, meta, output_path = run_model(stimpath=STIMPATH, cnn_oi=cnn_oi)
 #     save_features(features_perlayer, meta, cnn_oi, output_path, rep)
+
+def run_one(stimpath, cnn_oi):
+    features_perlayer, meta, output_path = run_model(stimpath=stimpath, cnn_oi=cnn_oi)
+    save_features(features_perlayer, meta, cnn_oi, output_path, repindex=None)
+
+
+run_one(stimpath=STIMPATH_HVMRET, cnn_oi='caffe_reference')
+run_one(stimpath=STIMPATH_HVMRET, cnn_oi='VGG_S')
+

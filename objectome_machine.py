@@ -61,7 +61,6 @@ def getClassifierRecord(features_task, meta_task, n_splits=2, classifiertype='sv
     train_q, test_q = {}, {}
     npc_all = [np.sum(meta_task['obj'] == o) for o in uobj]
     
-
     npc = min(npc_all)
     npc_train = npc/2
     npc_test = npc/2
@@ -95,6 +94,104 @@ def getClassifierRecord(features_task, meta_task, n_splits=2, classifiertype='sv
 
     return utils.compute_metric_base(features_task, meta_task, evalc, attach_models=True, return_splits=True)
 
+def getRegressorRecord(features_task, meta_task, labelfunc='s', n_splits=2):
+    if len(meta_task) == 1:
+        meta_task = meta_task[0]
+    features_task = np.squeeze(features_task)
+
+    uobj = list(set(meta_task['obj']))
+    npc_all = [np.sum(meta_task['obj'] == o) for o in uobj]
+    
+    npc = min(npc_all)
+    npc_train = npc/2
+    npc_test = npc/2
+    
+    evalc = {'npc_train': npc_train,
+        'npc_test': npc_test,
+        'num_splits': n_splits,
+        'npc_validate': 0,
+        'metric_screen': 'regression',
+        'metric_labels': None,
+        'metric_kwargs': {'model_type': 'linear_model.LinearRegression',
+                          'model_kwargs': {}},
+        'train_q': {},
+        'test_q': {},
+        'split_by': 'obj',
+        'labelfunc': labelfunc
+        }
+
+    return utils.compute_metric_base(features_task, meta_task, evalc, attach_models=False, return_splits=True)
+
+def getBehavioralPatternFromRecord(rec, meta):
+    nsplits = len(rec['splits'][0])
+    labelset = rec['result_summary']['labelset']
+    trials =  {'sample_obj':[], 'dist_obj':[], 'choice':[], 'id':[]}
+    for i in range(nsplits):
+        split_ind = rec['splits'][0][i]['test']
+        trials['choice'].extend(np.array(rec['split_results'][i]['test_prediction']))
+        trials['sample_obj'].extend( meta[split_ind]['obj'])
+        trials['dist_obj'].extend(np.array([np.setdiff1d(labelset,pl) for pl in meta[split_ind]['obj']]))
+        trials['id'].extend(meta[split_ind]['id'])
+    return trials
+
+def getBehavioralMetrics_base(features, meta, tasks):
+    trials =  {'sample_obj':[], 'dist_obj':[], 'choice':[], 'id':[]}
+    for task in tasks:
+        features_task = np.squeeze(features[task,:])
+        meta_task = meta[task][0]
+        rec_ = getClassifierRecord(features_task, meta_task)
+        beh_ = getBehavioralPatternFromRecord(rec_, meta_task)
+        [trials[fn].extend(beh_[fn]) for fn in trials]
+
+    trials_keys = trials.keys()
+    for fk in trials_keys:
+        trials[fk] = np.array(trials[fk])
+
+    return obj.compute_behavioral_metrics(trials, meta)
+
+def getBehavioralMetrics(features, meta, tasks):
+    s = features.shape
+    nim, nrep, nfeat = s[0],s[1],s[2]
+    rec = {'I1':[[],[]]}
+    niter = 10
+
+    for itr in range(niter):
+        trials =  {'sample_obj':[], 'dist_obj':[], 'choice':[], 'id':[]}
+
+        nrep_split = int(nrep/2)
+        feature_splits = {
+            'split1':np.zeros((nim, nrep_split, nfeat)),
+            'split2':np.zeros((nim, nrep_split, nfeat))}
+        for im in range(nim):
+            tmp = range(nrep)
+            np.random.shuffle(tmp)
+            feature_splits['split1'][im,:,:] = features[im,tmp[:nrep_split],:]
+            feature_splits['split2'][im,:,:] = features[im,tmp[-nrep_split:],:]
+        
+        
+        rec['I1'][0].append( getBehavioralMetrics_base(feature_splits['split1'].mean(1), meta, tasks)['I1'])
+        rec['I1'][1].append( getBehavioralMetrics_base(feature_splits['split2'].mean(1), meta, tasks)['I1'])
+
+    return rec
+
+def run_machine_features():
+    outpath = '/mindhive/dicarlolab/u/rishir/models/hvm10/' 
+    meta = obj.hvm_meta()
+    models_oi = np.array(obj.HVM_10)
+    tasks = obj.getBinaryTasks(meta, models_oi)
+
+    # features_n = ['fc6', 'fc7', 'fc8']
+    features_n = ['fc.pkl']
+    for fn in features_n:
+        outn = 'caffe_' + fn + '.pkl'
+        # feature_path = obj.hvm_stimpath() + 'caffe_features/' + fn + '.npy'
+        feature_path = obj.hvm_stimpath() + 'alexnet++/' + fn + '.pkl'
+        features = np.load(feature_path)
+        rec = obj.getBehavioralMetrics(features, meta, tasks)
+        with open(os.path.join(outpath, outn), 'wb') as _f:
+            pk.dump(rec, _f)
+    return
+
 def sampleFeatures(features, noise_model=None, subsample=None):
     if noise_model == None:
         feature_sample = features
@@ -114,8 +211,7 @@ def sampleFeatures(features, noise_model=None, subsample=None):
         np.random.shuffle(nunits)
         feature_sample = feature_sample[:,nunits[:subsample]]
     return feature_sample
-
-    
+   
 def getSplitHalfPerformance(rec, meta):
     nsplits = len(rec['splits'][0])
     perf_img = []
@@ -131,9 +227,9 @@ def getSplitHalfPerformance(rec, meta):
 
     return perf1, perf2
 
-
 def getSilencedPerformance(features_s, meta, rec, obj_idx=None):
     nsplits = len(rec['splits'][0])
+    all_labels = np.array([obj_idx[l] for l in np.unique(meta['obj'])])
     labelset = rec['result_summary']['labelset']
     performance, trials = [], []
     
@@ -193,20 +289,6 @@ def getTrialsFromRecord(rec, meta, obj_idx):
 
     return trials, trials_io
 
-def getBehavioralPatternFromRecord(rec, meta):
-    nsplits = len(rec['splits'][0])
-    labelset = rec['result_summary']['labelset']
-    trials =  []
-    for i in range(nsplits):
-        split_ind = rec['splits'][0][i]['test']
-        pred_labels = np.array(rec['split_results'][i]['test_prediction'])
-        actual_labels = meta[split_ind]['obj']
-        nonmatch_labels = [np.setdiff1d(labelset,pl) for pl in actual_labels]
-        image_fns = meta[split_ind]['id']
-
-
-    return trials
-
 def format_trials_var(trials):
     if (trials == None) | (trials == []):
         return trials
@@ -257,7 +339,6 @@ def getPerformanceFromFeatures_base(features, meta, task, objects_oi=None, featu
 
     return performance, performance_s, trials, trials_io, trials_s
         
-
 def computePairWiseConfusions_base(objects_oi, OUTPATH=None, silence_mode=0):
     """ For a set of objects, compute pixel and v1 features, run classifiers,
         and output trial structures for all 2x2 tasks.
@@ -343,10 +424,10 @@ def computePairWiseConfusions(objects_oi, OUTPATH=None):
         objs_oi = np.array(objects_oi)
 
     all_features, all_metas = obj.getAllFeatures(objs_oi)
-    features_oi = ['VGG', 'VGG_fc7', 'Caffe', 'Caffe_fc6', 'Caffe_fc7']
+    features_oi = ['Caffe_fc6', 'Caffe_fc7', 'Caffe', 'VGG_fc6', 'VGG_fc7', 'VGG']
     
     subsample = None
-    nsamples_noisemodel = 20
+    nsamples_noisemodel = 2
     result = {}
 
     for feat in features_oi:
@@ -360,12 +441,12 @@ def computePairWiseConfusions(objects_oi, OUTPATH=None):
         else:
             noise_model = None
 
-        print 'Running machine_objectome : ' + str(feat) + ': ' + str(features.shape) + '\t' + str(noise_model) + '\n'
+        print 'Running machine_objectome : ' + str(feat) + ': ' + str(features.shape) + '\t' + str(noise_model)
         for isample in range(nsamples_noisemodel):
             features_sample = sampleFeatures(features, noise_model, subsample)
             for task in tasks:
                 p_, p_s_, t_, t_io_, t_s_ = getPerformanceFromFeatures_base(features_sample, meta, task, objs_oi)
-		trials.extend(t_)
+                trials.extend(t_)
                 trials_io.extend(t_io_)
 	
         trials = format_trials_var(trials)
@@ -375,9 +456,9 @@ def computePairWiseConfusions(objects_oi, OUTPATH=None):
                 os.makedirs(OUTPATH)
             if subsample != None:
                 feat = feat + '_' + str(subsample)
-	    save_trials(trials, objs_oi, OUTPATH + feat + 'full_var_bg.mat')
-            save_trials(trials_io, objs_oi, OUTPATH + feat + 'full_var_bg_ideal_obs.mat')
-
+        print 'Saved to ' + OUTPATH
+        save_trials(trials, objs_oi, OUTPATH + feat + 'full_var_bg.mat')
+        save_trials(trials_io, objs_oi, OUTPATH + feat + 'full_var_bg_ideal_obs.mat')
         result[feat] = trials
 
     return result
@@ -389,7 +470,7 @@ def save_trials(trials, objs, outfn):
     scipy.io.savemat(outfn,mat_data)
     hr = (trials[:,0] == trials[:,3])
     perf = hr.sum() / (len(hr)*1.0)
-    print 'Saved (' + str(perf) + ') ' + outfn 
+    print 'Saved (' + str(perf) + ') ' + outfn.split('/')[-1]
 
 
 def quick_look(trials_s):
@@ -455,8 +536,13 @@ def run_textureless():
     res = computePairWiseConfusions(models_oi, OUTPATH)
     return
 
-def run_one(models_oi, OUTPATH):
-    OUTPATH = HOMEPATH + OUTPATH + '/output/' 
+def run_one(models_oi=None, OUTPATH=None):
+    if models_oi == None:
+        # models_oi = obj.models_combined24
+        # OUTPATH = HOMEPATH + 'combined24_nobg/output/'
+        # OUTPATH = HOMEPATH + 'combined24_retina/output/'
+        models_oi = obj.HVM_10
+        OUTPATH = HOMEPATH + 'hvm10_retina/' + 'output/'
     res = computePairWiseConfusions(models_oi, OUTPATH)
     return
 
