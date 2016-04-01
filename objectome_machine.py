@@ -132,17 +132,17 @@ def runClassifierRecord(features, meta, rec, classifiertype='svm'):
 
 def getBehavioralPatternFromRecord(rec, meta, obj_idx=None):
     nsplits = len(rec['splits'][0])
-    labelset = rec['result_summary']['labelset']
     trials =  {'sample_obj':[], 'dist_obj':[], 'choice':[], 'id':[]}
-    trial_idx, performance = []
+    trial_idx, performance = [],[]
 
     for s_ind, split in enumerate(rec['splits']):
+        labelset = rec['split_results'][s_ind]['labelset']
         split_ind = rec['splits'][0][s_ind]['test']
         pred_label = np.array(rec['split_results'][s_ind]['test_prediction'])
         true_label = meta[split_ind]['obj']
-        distr_label = np.array([np.setdiff1d(results['labelset'],pl) for pl in meta[split_ind]['obj']])
+        distr_label = [np.setdiff1d(labelset,pl)[0] for pl in meta[split_ind]['obj']]
 
-        perf = (pred_labels == true_label).sum() / (len(pred_labels)*1.0)
+        perf = (pred_label == true_label).sum() / (len(pred_label)*1.0)
         performance.extend([perf])
         
         trials['choice'].extend(pred_label)
@@ -156,6 +156,7 @@ def getBehavioralPatternFromRecord(rec, meta, obj_idx=None):
             distr_labels_i = np.array([obj_idx[pl] for pl in distr_label])
             trial_idx.extend(np.array([actual_labels_i, actual_labels_i, distr_labels_i, pred_labels_i]).T)
     performance = np.array(performance).mean(0)
+    trial_idx = np.array(trial_idx)
     return performance, trials, trial_idx
 
 def testFeatures_base(features, meta, task, objects_oi=None, features_s=None, nsplits=2):
