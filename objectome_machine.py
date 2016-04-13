@@ -39,8 +39,11 @@ def getBinaryTasks_pair(meta, object_pairs_oi):
         tasks.append(np.array(trial_ind))
     return tasks
 
-def getBinaryTasks_all(meta, objects_oi):
+def getBinaryTasks_all(meta, objects_oi=None):
     """ Returns binary tasks for all pairs of objects in objects_oi. """
+    if objects_oi == None:
+        objects_oi = np.unique(meta['obj'])
+        objects_oi = [i for o in objects_oi for i in o]
     nc_objs = len(objects_oi)
     pairings = list(itertools.combinations(range(nc_objs), 2))
     tasks = []
@@ -190,7 +193,7 @@ def testFeatures_base(features, meta, task, objects_oi=None, features_s=None, ns
 
     return performance, performance_s, trials, trials_s
         
-def testFeatures(features_oi, objects_oi):
+def testFeatures(features_oi, objects_oi, IMGPATH=None):
     if type(objects_oi) is dict:
         objs_oi = objects_oi['objs']
         tasks_oi = objects_oi['tasks']
@@ -198,7 +201,7 @@ def testFeatures(features_oi, objects_oi):
         tasks_oi = np.array(objects_oi)
         objs_oi = np.array(objects_oi)
 
-    all_features, all_metas = obj.getAllFeatures(objs_oi)
+    all_features, all_metas = obj.getAllFeatures(objs_oi, IMGPATH)
     
     subsample = None
     noise_model = None
@@ -223,12 +226,12 @@ def testFeatures(features_oi, objects_oi):
     return result
 
 """ ********** Main functions ********** """
-def computePairWiseConfusions(objects_oi, OUTPATH=None):
+def computePairWiseConfusions(objects_oi, OUTPATH=None, IMGPATH=None):
     """ For a set of objects and features, run classifiers,
         and output trial structures for all 2x2 tasks.
     """
     features_oi = ['Caffe_fc6', 'Caffe_fc7', 'Caffe', 'VGG_fc6', 'VGG_fc7', 'VGG']
-    result = testFeatures(features_oi, objects_oi)
+    result = testFeatures(features_oi, objects_oi, IMGPATH)
     
     for feat in features_oi:
         if OUTPATH != None:
@@ -521,7 +524,8 @@ def computePairWiseConfusions_old(objects_oi, OUTPATH=None):
     result = {}
 
     for feat in features_oi:
-
+        if feat not in all_features.key():
+            continue
         features = all_features[feat]
         meta = all_metas[feat]
         tasks = getBinaryTasks(meta, tasks_oi)
@@ -621,6 +625,13 @@ def run_textureless():
         models_oi[i] = m + '_tf'
     OUTPATH = HOMEPATH  + 'combined24_textureless/output/' 
     res = computePairWiseConfusions(models_oi, OUTPATH)
+    return
+
+def run_letters():
+    models_oi = obj.SYMBOLS_all
+    IMGPATH = '/mindhive/dicarlolab/u/rishir/stimuli/alphabet_textured/'
+    OUTPATH = HOMEPATH  + 'symbols_all/output/' 
+    res = computePairWiseConfusions(models_oi, OUTPATH, IMGPATH)
     return
 
 def run_one(models_oi=None, OUTPATH=None):

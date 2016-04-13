@@ -11,10 +11,10 @@ STIMPATH_OBJ = '/mindhive/dicarlolab/u/rishir/stimuli/objectome64s100/'
 STIMPATH_OBJNOBG = '/mindhive/dicarlolab/u/rishir/stimuli/objectome64s100nobg/'
 STIMPATH_OBJRET = '/mindhive/dicarlolab/u/rishir/stimuli/objectome64s100ret/'
 
-IMGPATH = STIMPATH_HVMRET
+IMGPATH_DEFAULT = STIMPATH_HVMRET
 
 
-def getPixelFeatures(objects_oi, normalize_on=False):
+def getPixelFeatures(objects_oi, normalize_on=False, IMGPATH=IMGPATH_DEFAULT):
     """ compute pixel features on images of objects of interest """
     meta = pk.load(open(IMGPATH + 'metadata.pkl', 'r'))
 
@@ -38,7 +38,7 @@ def getPixelFeatures(objects_oi, normalize_on=False):
     pixel_meta = meta[meta_ind]
     return pixels_features, pixel_meta
 
-def getPixelFeatures_localized(objects_oi):
+def getPixelFeatures_localized(objects_oi, IMGPATH=IMGPATH_DEFAULT):
     """ compute pixel features on images of objects of interest - localized to window based on metadata """
     meta = pk.load(open(IMGPATH + 'metadata.pkl', 'r'))
     meta_ind, image_paths, pixels_features = [], [], []
@@ -77,7 +77,7 @@ def getPixelFeatures_localized(objects_oi):
     pixel_meta = meta[meta_ind]
     return pixels_features, pixel_meta
 
-def getV1Features(objects_oi):
+def getV1Features(objects_oi, IMGPATH=IMGPATH_DEFAULT):
     """ load v1 features on images of objects of interest """
     meta = pk.load(open(IMGPATH + 'metadata.pkl', 'r'))
 
@@ -97,8 +97,7 @@ def getV1Features(objects_oi):
     v1_meta = meta[meta_ind]
     return v1_features, v1_meta
 
-
-def getSLFFeatures(objects_oi):
+def getSLFFeatures(objects_oi, IMGPATH=IMGPATH_DEFAULT):
     """ SLF model features (Munch 2008) -- similar to hmax """
     meta = pk.load(open(IMGPATH + 'metadata.pkl', 'r'))
     SLFPATH = '/mindhive/dicarlolab/u/rishir/stimuli/objectome64s100/yamins_slf/slf_trainhvm_extract_obj64s100/'
@@ -123,7 +122,7 @@ def getSLFFeatures(objects_oi):
 
     return slf_features, slf_meta
 
-def getSLFFeatures_HH(objects_oi):
+def getSLFFeatures_HH(objects_oi, IMGPATH=IMGPATH_DEFAULT):
     """ SLF model features (Munch 2008) -- similar to hmax -- used precomputed features by hahong """
     METAPATH = '/mindhive/dicarlolab/u/rishir/lib/mturkutils/experiments/adjective_rating_fullvar/references/meta64.pkl'
     meta = pk.load(open(METAPATH, 'r'))
@@ -147,7 +146,7 @@ def getSLFFeatures_HH(objects_oi):
 
     return slf_features, slf_meta
 
-def getNYUFeatures(objects_oi, layer=6):
+def getNYUFeatures(objects_oi, layer=6, IMGPATH=IMGPATH_DEFAULT):
     """ NYU model features (Zeiler 2013) -- see archconvnet """
     meta = pk.load(open(IMGPATH + 'metadata.pkl', 'r'))
     if layer == 6:
@@ -176,7 +175,7 @@ def getNYUFeatures(objects_oi, layer=6):
     meta_ = meta[meta_ind]
     return features, meta_
 
-def getCaffeFeatures(objects_oi, layer=8):
+def getCaffeFeatures(objects_oi, layer=8, IMGPATH=IMGPATH_DEFAULT):
     """ Caffe reference model -- from Caffe """
     meta = pk.load(open(IMGPATH + 'metadata.pkl', 'r'))
     
@@ -201,7 +200,7 @@ def getCaffeFeatures(objects_oi, layer=8):
     meta_ = meta[meta_ind]
     return features, meta_
 
-def getCaffeNOBGFeatures(objects_oi, layer=8):
+def getCaffeNOBGFeatures(objects_oi, layer=8, IMGPATH=IMGPATH_DEFAULT):
     """ Caffe reference model -- from Caffe """
     meta = pk.load(open(IMGPATH + 'metadata.pkl', 'r'))
     
@@ -226,8 +225,7 @@ def getCaffeNOBGFeatures(objects_oi, layer=8):
     meta_ = meta[meta_ind]
     return features, meta_
 
-
-def getVGGFeatures(objects_oi, layer=8):
+def getVGGFeatures(objects_oi, layer=8, IMGPATH=IMGPATH_DEFAULT):
     """ VGG features -- from Caffe """
     meta = pk.load(open(IMGPATH + 'metadata.pkl', 'r'))
     
@@ -252,7 +250,7 @@ def getVGGFeatures(objects_oi, layer=8):
     meta_ = meta[meta_ind]
     return features, meta_
 
-def getHyoFeatures(objects_oi, layer=8):
+def getHyoFeatures(objects_oi, layer=8, IMGPATH=IMGPATH_DEFAULT):
     """ Alexnet features with synthetic+imgnet training -- from Hyo  """
     meta = pk.load(open(IMGPATH + 'metadata.pkl', 'r'))
     
@@ -267,7 +265,7 @@ def getHyoFeatures(objects_oi, layer=8):
 
     return features, meta
 
-def getNeuralFeatures(objects_oi, area='IT', stim='hh'):
+def getNeuralFeatures(objects_oi, area='IT', stim='hh', IMGPATH=IMGPATH_DEFAULT):
     meta = pk.load(open(IMGPATH + 'metadata.pkl', 'r'))
     if stim == 'hh':
         feat_fn = 'neural_features/rawdat/hh/' + str(area) + '.pkl'
@@ -299,8 +297,7 @@ def getNeuralFeatures(objects_oi, area='IT', stim='hh'):
     meta_ = meta[meta_ind]
     return features, meta_
 
-
-def getAllFeatures(objects_oi):
+def getAllFeatures(objects_oi, IMGPATH=IMGPATH_DEFAULT):
 
     objects_oi = np.unique(objects_oi)
     all_features = {}

@@ -78,6 +78,16 @@ HVM_10 = [ 'bear', 'ELEPHANT_M', '_18', 'face0001', 'alfa155', 'breed_pug', 'TUR
 #bear, elephant, table, face, 
 #HVM new (6): car, dog, turtle, apple, chair, plane 
 
+SYMBOLS_alpharoman = ['Letter_A', 'Letter_B', 'Letter_C', 'Letter_D', 'Letter_E','Letter_F', 'Letter_G', 'Letter_H', 'Letter_I', 'Letter_J',
+    'Letter_K', 'Letter_L', 'Letter_M', 'Letter_N', 'Letter_O', 'Letter_P', 'Letter_Q', 'Letter_R', 'Letter_S', 'Letter_T',
+    'Letter_U', 'Letter_V', 'Letter_W', 'Letter_X', 'Letter_Y', 'Letter_Z']
+SYMBOLS_alphaarab = ['1_alif', '2_baa', '3_taa', '4_thaa', '5_jiim', '6_haa', '7_kha', '8_daal', '9_thaal', '10_raa', '11_zaay', '12_siin',
+'13_shiin','14_saad', '15_daad', '16_taa', '17_thaa', '18_ayn', '19_ghayn', '20_faa', '21_qaaf', '22_kaaf', '23_laam', '24_miim', '25_nuun', 
+'26_ha', '27_waaw', '28_yaa']
+SYMBOLS_numbersarab = ['zero', 'one', 'two', 'three', 'four','five', 'six', 'seven', 'eight', 'nine']
+
+SYMBOLS_all = SYMBOLS_alpharoman + SYMBOLS_alphaarab + SYMBOLS_numbersarab
+
 """ Load metadata for different imagesets """
 def hvm_meta():
     return pk.load(open('/mindhive/dicarlolab/u/rishir/stimuli/hvm/metadata.pkl', 'r'))

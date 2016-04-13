@@ -17,6 +17,7 @@ STIMPATH_HVMRET = '/mindhive/dicarlolab/u/rishir/stimuli/hvmret/'
 STIMPATH_OBJ = '/mindhive/dicarlolab/u/rishir/stimuli/objectome64s100/'
 STIMPATH_OBJNOBG = '/mindhive/dicarlolab/u/rishir/stimuli/objectome64s100nobg/'
 STIMPATH_OBJRET = '/mindhive/dicarlolab/u/rishir/stimuli/objectome64s100ret/'
+STIMPATH_ALPHALOWVAR = '/mindhive/dicarlolab/u/rishir/stimuli/alphabet_textured/'
 
 BATCHSIZE = 40
 MAXNSTIM = 1000000000
@@ -175,6 +176,6 @@ def run_one(stimpath, cnn_oi):
     save_features(features_perlayer, meta, cnn_oi, output_path, repindex=None)
 
 
-run_one(stimpath=STIMPATH_HVMRET, cnn_oi='caffe_reference')
-run_one(stimpath=STIMPATH_HVMRET, cnn_oi='VGG_S')
+run_one(stimpath=STIMPATH_ALPHALOWVAR, cnn_oi='caffe_reference')
+run_one(stimpath=STIMPATH_ALPHALOWVAR, cnn_oi='VGG_S')
 
