@@ -314,13 +314,13 @@ def getAllFeatures(objects_oi, IMGPATH=IMGPATH_DEFAULT):
     # all_features['NYU_penult'], all_metas['NYU_penult'] = getNYUFeatures(objects_oi, layer=5)
     # all_features['NYU'], all_metas['NYU'] = getNYUFeatures(objects_oi)
 
-    all_features['VGG_fc6'], all_metas['VGG_fc6'] = getVGGFeatures(objects_oi, layer=6)
-    all_features['VGG_fc7'], all_metas['VGG_fc7'] = getVGGFeatures(objects_oi, layer=7)
-    all_features['VGG'], all_metas['VGG'] = getVGGFeatures(objects_oi, layer=8)
+    all_features['VGG_fc6'], all_metas['VGG_fc6'] = getVGGFeatures(objects_oi, 6, IMGPATH)
+    all_features['VGG_fc7'], all_metas['VGG_fc7'] = getVGGFeatures(objects_oi, 7, IMGPATH)
+    all_features['VGG'], all_metas['VGG'] = getVGGFeatures(objects_oi, 8, IMGPATH)
     
-    all_features['Caffe_fc6'], all_metas['Caffe_fc6'] = getCaffeFeatures(objects_oi, layer=6)
-    all_features['Caffe_fc7'], all_metas['Caffe_fc7'] = getCaffeFeatures(objects_oi, layer=7)
-    all_features['Caffe'], all_metas['Caffe'] = getCaffeFeatures(objects_oi, layer=8)
+    all_features['Caffe_fc6'], all_metas['Caffe_fc6'] = getCaffeFeatures(objects_oi, 6, IMGPATH)
+    all_features['Caffe_fc7'], all_metas['Caffe_fc7'] = getCaffeFeatures(objects_oi, 7, IMGPATH)
+    all_features['Caffe'], all_metas['Caffe'] = getCaffeFeatures(objects_oi, 8, IMGPATH)
     
     #all_features['AlexnetHyo'], all_metas['AlexnetHyo'] = getHyoFeatures(objects_oi, layer=8)
 
