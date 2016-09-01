@@ -104,7 +104,7 @@ def objectome_stimpath():
 """ Utilities relating to objectome objects"""
 
 
-CANONICAL_ANGLES_obj24 = {
+CANONICAL_ANGLES_obj24_old = {
     ('flarenut_spanner'):           {'rxy':0,   'rxz':0,   'ryz':90},
     ('lo_poly_animal_RHINO_2',
      'womens_stockings_01M',
@@ -129,6 +129,34 @@ CANONICAL_ANGLES_obj24 = {
     ('interior_details_130_2'):     {'rxy':180, 'rxz':0,    'ryz':270},
     ('calc01'):                     {'rxy':0,   'rxz':0,    'ryz':0},
     ('MB28699'):                    {'rxy':180, 'rxz':270,  'ryz':270},
+}
+
+
+CANONICAL_ANGLES_obj24 = {
+    '22_acoustic_guitar': {'rxy':0, 'rxz':270, 'ryz': 0},
+    'antique_furniture_item_18': {'rxy':0, 'rxz':270, 'ryz':0},
+    'build51': {'rxy':0, 'rxz':270, 'ryz':90},
+    'calc01': {'rxy':0,'rxz':0,'ryz':180},
+    'dromedary': {'rxy':90, 'rxz':0,'ryz':0},
+    'flarenut_spanner': {'rxy':0, 'rxz':180, 'ryz': 90},
+    'interior_details_103_4': {'rxy':0, 'rxz':0, 'ryz': 0},
+    'interior_details_130_2': {'rxy':0, 'rxz':0,'ryz':90},
+    'lo_poly_animal_CHICKDEE': {'rxy':0, 'rxz':270, 'ryz':270},
+    'lo_poly_animal_RHINO_2': {'rxy':0,'rxz':270, 'ryz':270},
+    'MB28699': {'rxy':0, 'rxz':90, 'ryz':270},
+    'MB29874' : {'rxy':90, 'rxz':0, 'ryz':0},
+    'MB30203': {'rxy':0, 'rxz':90, 'ryz':270},
+    'womens_shorts_01M': {'rxy':0, 'rxz':270, 'ryz':180},
+    'zebra': {'rxy':90, 'rxz':0, 'ryz':0},
+    'Hanger_02': {'rxy':0, 'rxz':270,'ryz':180},
+    'kitchen_equipment_knife2': {'rxy':0, 'rxz':180, 'ryz':180},
+    'lo_poly_animal_BEAR_BLK' : {'rxy':0, 'rxz':270, 'ryz':0},
+    'womens_stockings_01M': {'rxy':0, 'rxz':270, 'ryz':90},
+    'MB30758': {'rxy':90,  'rxz':180,    'ryz':0},
+    'lo_poly_animal_ELE_AS1': {'rxy':0,   'rxz':270,   'ryz':270},
+    'weimaraner':   {'rxy':90,  'rxz':180,    'ryz':180},
+    'lo_poly_animal_TRANTULA': {'rxy':0,   'rxz':270,   'ryz':90},
+    'MB27346': {'rxy':90,  'rxz':0,    'ryz':0},
 }
 
 def get_canonical_angle(objn):

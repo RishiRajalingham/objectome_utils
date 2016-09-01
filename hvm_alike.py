@@ -149,7 +149,7 @@ CANONICAL_SIZES = {'Apple_Fruit_obj': 98,
  'z3': 102}
 
 
-def get_canonical_angle(objn):
+def get_canonical_angle_hvm(objn):
     canonkeys = CANONICAL_ANGLES.keys()
     angles = [CANONICAL_ANGLES[cobj] for cobj in canonkeys if objn in cobj]
     if len(angles) == 0:
@@ -157,5 +157,5 @@ def get_canonical_angle(objn):
     else:
         return angles[0]
     
-def get_obj_name(obj_oi):
+def get_obj_name_hvm(obj_oi):
     return [OBJECT_DICT[objn] for objn in obj_oi]

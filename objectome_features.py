@@ -11,7 +11,7 @@ STIMPATH_OBJ = '/mindhive/dicarlolab/u/rishir/stimuli/objectome64s100/'
 STIMPATH_OBJNOBG = '/mindhive/dicarlolab/u/rishir/stimuli/objectome64s100nobg/'
 STIMPATH_OBJRET = '/mindhive/dicarlolab/u/rishir/stimuli/objectome64s100ret/'
 
-IMGPATH_DEFAULT = STIMPATH_HVMRET
+IMGPATH_DEFAULT = STIMPATH_OBJ
 
 
 def getPixelFeatures(objects_oi, normalize_on=False, IMGPATH=IMGPATH_DEFAULT):
@@ -28,7 +28,7 @@ def getPixelFeatures(objects_oi, normalize_on=False, IMGPATH=IMGPATH_DEFAULT):
     for i, m in enumerate(meta):
         if m['obj'] in objects_oi:
             meta_ind.append(i)
-            image_paths +=  [IMGPATH + 'obj64s100/' + m['id'] + '.png']
+            image_paths +=  [IMGPATH + 'images/' + m['id'] + '.png']
 
     imgs = larray.lmap(ImgLoaderResizer(inshape=(256,256), shape=(256,256), dtype='float32',normalize=normalize_on, mask=None), image_paths)
     imgs = np.array(imgs)
@@ -91,7 +91,7 @@ def getV1Features(objects_oi, IMGPATH=IMGPATH_DEFAULT):
     for i, m in enumerate(meta):
         if m['obj'] in objects_oi:
             meta_ind.append(i)
-            feature_paths +=  [IMGPATH + 'v1like_features/images/' + m['id'] + '.png.dat']
+            feature_paths +=  [IMGPATH + 'v1like_features/images/' + m['obj'] + '_' + m['id'] + '.png.dat']
 
     v1_features = np.array([pk.load(open(fp,'r')) for fp in feature_paths])
     v1_meta = meta[meta_ind]
@@ -163,6 +163,31 @@ def getNYUFeatures(objects_oi, layer=6, IMGPATH=IMGPATH_DEFAULT):
         # fid = feature_data['id']
         # features = np.array(feature_data['feature'])
 
+    """ fix obj field"""
+    if len(meta[0]['obj']) == 1:
+        for i,m in enumerate(meta):
+            meta[i]['obj'] = m['obj'][0]
+    meta_ind = []
+    for f in fid:
+        ind = np.array(np.nonzero(meta['id'] == f)).flatten()[0]
+        meta_ind.append(ind)
+
+    meta_ = meta[meta_ind]
+    return features, meta_
+
+def getAlexNetFeatures(objects_oi, layer=8, IMGPATH=IMGPATH_DEFAULT):
+    """ Caffe reference model -- from Caffe """
+    meta = pk.load(open(IMGPATH + 'metadata.pkl', 'r'))
+    
+    feat_fn = 'alexnet_features/fc' + str(layer) + '.pkl'
+    feature_data = pk.load(open(IMGPATH + feat_fn, 'r'))
+    fid, features = [], []
+    for f in feature_data:
+        fid.append(f['id'])
+        features.append(f['feature'])
+
+    features = np.array(features)
+        
     """ fix obj field"""
     if len(meta[0]['obj']) == 1:
         for i,m in enumerate(meta):
@@ -250,6 +275,32 @@ def getVGGFeatures(objects_oi, layer=8, IMGPATH=IMGPATH_DEFAULT):
     meta_ = meta[meta_ind]
     return features, meta_
 
+def getGoogleNetFeatures(objects_oi, layer='pool5_7x7_s1', IMGPATH=IMGPATH_DEFAULT):
+    """ gnet features -- from Caffe """
+    meta = pk.load(open(IMGPATH + 'metadata.pkl', 'r'))
+    
+    feat_fn = 'googlenet_features/' + layer + '.pkl'
+    feature_data = pk.load(open(IMGPATH + feat_fn, 'r'))
+    fid, features = [], []
+    for f in feature_data:
+        fid.append(f['id'])
+        features.append(f['feature'])
+
+    features = np.array(features)
+        
+    """ fix obj field"""
+    if len(meta[0]['obj']) == 1:
+        for i,m in enumerate(meta):
+            meta[i]['obj'] = m['obj'][0]
+    meta_ind = []
+    for f in fid:
+        ind = np.array(np.nonzero(meta['id'] == f)).flatten()[0]
+        meta_ind.append(ind)
+
+    meta_ = meta[meta_ind]
+    return features, meta_
+
+
 def getHyoFeatures(objects_oi, layer=8, IMGPATH=IMGPATH_DEFAULT):
     """ Alexnet features with synthetic+imgnet training -- from Hyo  """
     meta = pk.load(open(IMGPATH + 'metadata.pkl', 'r'))
@@ -303,13 +354,15 @@ def getAllFeatures(objects_oi, IMGPATH=IMGPATH_DEFAULT):
     all_features = {}
     all_metas = {}
 
+    if IMGPATH == None:
+        IMGPATH = IMGPATH_DEFAULT
     print  'Loading from ... ' +  IMGPATH 
     
     # all_features['PXL'], all_metas['PXL'] = getPixelFeatures(objects_oi, normalize_on=False)
-    # all_features['PXLn'], all_metas['PXLn'] = getPixelFeatures(objects_oi, normalize_on=True)
+    all_features['PXLn'], all_metas['PXLn'] = getPixelFeatures(objects_oi, normalize_on=True)
     # all_features['PXL_loc'], all_metas['PXL_loc'] = getPixelFeatures_localized(objects_oi)
-    # all_features['V1'], all_metas['V1'] = getV1Features(objects_oi)
-    # all_features['HMAX'], all_metas['HMAX'] = getSLFFeatures_HH(objects_oi)
+    all_features['V1'], all_metas['V1'] = getV1Features(objects_oi)
+    all_features['HMAX'], all_metas['HMAX'] = getSLFFeatures_HH(objects_oi)
     # all_features['SLF'], all_metas['SLF'] = getSLFFeatures(objects_oi)
     # all_features['NYU_penult'], all_metas['NYU_penult'] = getNYUFeatures(objects_oi, layer=5)
     # all_features['NYU'], all_metas['NYU'] = getNYUFeatures(objects_oi)
@@ -318,9 +371,15 @@ def getAllFeatures(objects_oi, IMGPATH=IMGPATH_DEFAULT):
     all_features['VGG_fc7'], all_metas['VGG_fc7'] = getVGGFeatures(objects_oi, 7, IMGPATH)
     all_features['VGG'], all_metas['VGG'] = getVGGFeatures(objects_oi, 8, IMGPATH)
     
-    all_features['Caffe_fc6'], all_metas['Caffe_fc6'] = getCaffeFeatures(objects_oi, 6, IMGPATH)
-    all_features['Caffe_fc7'], all_metas['Caffe_fc7'] = getCaffeFeatures(objects_oi, 7, IMGPATH)
-    all_features['Caffe'], all_metas['Caffe'] = getCaffeFeatures(objects_oi, 8, IMGPATH)
+    # all_features['Caffe_fc6'], all_metas['Caffe_fc6'] = getCaffeFeatures(objects_oi, 6, IMGPATH)
+    # all_features['Caffe_fc7'], all_metas['Caffe_fc7'] = getCaffeFeatures(objects_oi, 7, IMGPATH)
+    # all_features['Caffe'], all_metas['Caffe'] = getCaffeFeatures(objects_oi, 8, IMGPATH)
+
+    all_features['Alexnet_fc6'], all_metas['Alexnet_fc6'] = getCaffeFeatures(objects_oi, 6, IMGPATH)
+    all_features['Alexnet_fc7'], all_metas['Alexnet_fc7'] = getCaffeFeatures(objects_oi, 7, IMGPATH)
+    all_features['Alexnet'], all_metas['Alexnet'] = getCaffeFeatures(objects_oi, 8, IMGPATH)
+
+    all_features['Googlenet'], all_metas['Googlenet'] = getGoogleNetFeatures(objects_oi, 'pool5_7x7_s1', IMGPATH)
     
     #all_features['AlexnetHyo'], all_metas['AlexnetHyo'] = getHyoFeatures(objects_oi, layer=8)
 

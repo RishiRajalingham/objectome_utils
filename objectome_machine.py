@@ -23,7 +23,10 @@ METRIC_KWARGS = {
         'model_kwargs': {'C': 50000, 'class_weight': 'auto',
         'kernel': 'linear'}},
     'mcc':  {'model_type': 'MCC2',
-        'model_kwargs': {'fnorm': True, 'snorm': False}}
+        'model_kwargs': {'fnorm': True, 'snorm': False}},
+    'rbfsvm': {'model_type': 'libSVM', 
+        'model_kwargs': {'C': 50000, 'class_weight': 'auto',
+        'kernel': 'rbf'}}
 }
 
 """ ********** Binary task formatting ********** """
@@ -144,6 +147,7 @@ def getBehavioralPatternFromRecord(rec, meta, obj_idx=None):
         pred_label = np.array(rec['split_results'][s_ind]['test_prediction'])
         true_label = meta[split_ind]['obj']
         distr_label = [np.setdiff1d(labelset,pl)[0] for pl in meta[split_ind]['obj']]
+        imgid = meta[split_ind]['id']
 
         perf = (pred_label == true_label).sum() / (len(pred_label)*1.0)
         performance.extend([perf])
@@ -151,13 +155,14 @@ def getBehavioralPatternFromRecord(rec, meta, obj_idx=None):
         trials_dict['choice'].extend(pred_label)
         trials_dict['sample_obj'].extend(true_label)
         trials_dict['dist_obj'].extend(distr_label)
-        trials_dict['id'].extend(meta[split_ind]['id'])
+        trials_dict['id'].extend(imgid)
 
         if obj_idx != None:
             pred_labels_i = np.array([obj_idx[pl] for pl in pred_label])
             actual_labels_i = np.array([obj_idx[pl] for pl in true_label])
             distr_labels_i = np.array([obj_idx[pl] for pl in distr_label])
-            trials.extend(np.array([actual_labels_i, actual_labels_i, distr_labels_i, pred_labels_i]).T)
+            imgid_i = np.array([obj.get_index_MWorksRelative(pl) for pl in imgid])
+            trials.extend(np.array([actual_labels_i, actual_labels_i, distr_labels_i, pred_labels_i, imgid_i]).T)
     performance = np.array(performance).mean(0)
     trials = np.array(trials)
     return performance, trials_dict, trials
@@ -173,7 +178,7 @@ def testFeatures_base(features, meta, task, objects_oi=None, features_s=None, ns
         obj_idx[m] = i
     
     rec = getClassifierRecord(features_task, meta_task, nsplits)
-    performance, trials_dict, trials = getBehavioralPatternFromRecord(rec, meta, obj_idx)
+    performance, trials_dict, trials = getBehavioralPatternFromRecord(rec, meta_task, obj_idx)
     
     trials_s, performance_s = {}, {}
     if features_s != None:
@@ -201,9 +206,9 @@ def testFeatures(all_features, all_metas, features_oi, objects_oi):
         tasks_oi = np.array(objects_oi)
         objs_oi = np.array(objects_oi)
 
-    subsample = None
+    subsample = 1000
     noise_model = None
-    nsamples_noisemodel = 2
+    nsamples_noisemodel = 10
     result = {'objs_oi':objs_oi}
 
     for feat in features_oi:
@@ -217,7 +222,7 @@ def testFeatures(all_features, all_metas, features_oi, objects_oi):
         for isample in range(nsamples_noisemodel):
             features_sample = sampleFeatures(features, noise_model, subsample)
             for task in tasks:
-                p_, p_s_, t_, t_s_ = testFeatures_base(features, meta, task, objs_oi)
+                p_, p_s_, t_, t_s_ = testFeatures_base(features_sample, meta, task, objs_oi, features_s=None, nsplits=20)
                 trials.extend(t_)
                 # performance.extend(p_)
         trials = format_trials_var(trials)
@@ -229,7 +234,7 @@ def computePairWiseConfusions(objects_oi, OUTPATH=None, IMGPATH=None):
     """ For a set of objects and features, run classifiers,
         and output trial structures for all 2x2 tasks.
     """
-    features_oi = ['Caffe_fc6', 'Caffe_fc7', 'Caffe', 'VGG_fc6', 'VGG_fc7', 'VGG']
+    features_oi = ['PXLn', 'V1', 'HMAX', 'Alexnet_fc6', 'Alexnet_fc7', 'Alexnet', 'VGG_fc6', 'VGG_fc7', 'VGG', 'Googlenet']
     all_features, all_metas = obj.getAllFeatures(objects_oi, IMGPATH)
     result = testFeatures(all_features, all_metas, features_oi, objects_oi)
     
@@ -239,8 +244,6 @@ def computePairWiseConfusions(objects_oi, OUTPATH=None, IMGPATH=None):
         if OUTPATH != None:
             if not os.path.exists(OUTPATH):
                 os.makedirs(OUTPATH)
-            if subsample != None:
-                feat = feat + '_' + str(subsample)
         print 'Save to ' + OUTPATH
         save_trials(result[feat], result['objs_oi'], OUTPATH + feat + 'full_var_bg.mat')
     return 
@@ -519,7 +522,8 @@ def computePairWiseConfusions_old(objects_oi, OUTPATH=None):
         objs_oi = np.array(objects_oi)
 
     all_features, all_metas = obj.getAllFeatures(objs_oi)
-    features_oi = ['Caffe_fc6', 'Caffe_fc7', 'Caffe', 'VGG_fc6', 'VGG_fc7', 'VGG']
+    # features_oi = ['Caffe_fc6', 'Caffe_fc7', 'Caffe', 'VGG_fc6', 'VGG_fc7', 'VGG']
+    features_oi = ['Alexnet_fc6', 'Alexnet_fc7', 'Alexnet']
     
     subsample = None
     nsamples_noisemodel = 2
@@ -631,18 +635,19 @@ def run_textureless():
 
 def run_letters():
     models_oi = obj.SYMBOLS_all
-    IMGPATH = '/mindhive/dicarlolab/u/rishir/stimuli/alphabet_textured/'
-    OUTPATH = HOMEPATH  + 'symbols_all/output/' 
+    IMGPATH = '/mindhive/dicarlolab/u/rishir/stimuli/alphabet_highvar_textured/'
+    OUTPATH = HOMEPATH  + 'symbols_highvar_all/output/' 
     res = computePairWiseConfusions(models_oi, OUTPATH, IMGPATH)
     return
 
 def run_one(models_oi=None, OUTPATH=None):
     if models_oi == None:
-        # models_oi = obj.models_combined24
+        models_oi = obj.models_combined24
+        OUTPATH = HOMEPATH + 'combined24/output/'
         # OUTPATH = HOMEPATH + 'combined24_nobg/output/'
         # OUTPATH = HOMEPATH + 'combined24_retina/output/'
-        models_oi = obj.HVM_10
-        OUTPATH = HOMEPATH + 'hvm10_retina/' + 'output/'
+        # models_oi = obj.HVM_10
+        # OUTPATH = HOMEPATH + 'hvm10_retina/' + 'output/'
     res = computePairWiseConfusions(models_oi, OUTPATH)
     return
 

@@ -18,15 +18,29 @@ STIMPATH_OBJ = '/mindhive/dicarlolab/u/rishir/stimuli/objectome64s100/'
 STIMPATH_OBJNOBG = '/mindhive/dicarlolab/u/rishir/stimuli/objectome64s100nobg/'
 STIMPATH_OBJRET = '/mindhive/dicarlolab/u/rishir/stimuli/objectome64s100ret/'
 STIMPATH_ALPHALOWVAR = '/mindhive/dicarlolab/u/rishir/stimuli/alphabet_textured/'
+STIMPATH_ALPHAHIGHVAR = '/mindhive/dicarlolab/u/rishir/stimuli/alphabet_highvar_textured/'
+
+STIMPATH_ONLYRXY = '/mindhive/dicarlolab/u/rishir/stimuli/objectome24s100_var/objectome24_onlyrxy/'
+STIMPATH_ONLYRXZ = '/mindhive/dicarlolab/u/rishir/stimuli/objectome24s100_var/objectome24_onlyrxz/'
+STIMPATH_ONLYRYZ = '/mindhive/dicarlolab/u/rishir/stimuli/objectome24s100_var/objectome24_onlyryz/'
 
 BATCHSIZE = 40
 MAXNSTIM = 1000000000
+
+layers_oi = {
+    'VGG_S':            {'fc6', 'fc7', 'fc8'}, 
+    'caffe_reference':  {'fc6', 'fc7', 'fc8'}, 
+    'AlexNet': {'conv5'}, # {'fc6', 'fc7', 'fc8'}, 
+    'GoogLeNet':        {'pool5/7x7_s1'},
+    'ResNet': {'fc1000'}
+}
 
 def save_features(features_perlayer, meta, cnn_oi, output_path, repindex=None):
     layers = features_perlayer.keys()
     for layer in layers:
         features_dict = []
         features = np.array(features_perlayer[layer])
+        layer_name = layer.replace('/', '_')
         for i,m in enumerate(meta[:MAXNSTIM]):
             f_ = {'id':m['id'], 
                 'feature':features[i], 
@@ -36,9 +50,9 @@ def save_features(features_perlayer, meta, cnn_oi, output_path, repindex=None):
 
         # Save output
         if repindex == None:
-            outfn = output_path + layer + '.pkl'
+            outfn = output_path + layer_name + '.pkl'
         else:
-            outfn = output_path + 'reps/' + layer + '_' + str(repindex) + '.pkl'
+            outfn = output_path + 'reps/' + layer_name + '_' + str(repindex) + '.pkl'
 
         if os.path.exists(output_path) == False:
             os.mkdir(output_path)
@@ -53,17 +67,40 @@ def get_net(stimpath, cnn_oi='VGG_S'):
         input_size = 227
         proto_file = caffe_root + 'models/bvlc_reference_caffenet/deploy.prototxt'
         model_file = caffe_root + 'models/bvlc_reference_caffenet/bvlc_reference_caffenet.caffemodel'
-        model_input = '/om/user/shayo/caffe/caffe/models/bvlc_reference_caffenet'
+        model_input = caffe_root + 'models/bvlc_reference_caffenet'
         channel_order = (2,1,0) # the reference model has channels in BGR order instead of RGB
         output_path = stimpath + 'caffe_features/'
-
     elif cnn_oi == 'VGG_S':
         input_size = 224
         proto_file = caffe_root + 'models/VGG_CNN_S/VGG_CNN_S_deploy.prototxt'
         model_file = caffe_root + 'models/VGG_CNN_S/VGG_CNN_S.caffemodel'
-        model_input = '/om/user/shayo/caffe/caffe/models/VGG_CNN_S'
+        model_input = caffe_root + 'models/VGG_CNN_S'
         channel_order = (2,1,0) #???
         output_path = stimpath + 'vgg_features/'
+    elif cnn_oi == 'GoogLeNet':
+        input_size = 224
+        proto_file = caffe_root + 'models/bvlc_googlenet/deploy.prototxt'
+        model_file = caffe_root + 'models/bvlc_googlenet/bvlc_googlenet.caffemodel'
+        model_input = caffe_root + 'models/bvlc_googlenet'
+        channel_order = (2,1,0) #???
+        output_path = stimpath + 'googlenet_features/'
+    elif cnn_oi == 'AlexNet':
+        input_size = 227
+        proto_file = caffe_root + 'models/bvlc_alexnet/deploy.prototxt'
+        model_file = caffe_root + 'models/bvlc_alexnet/bvlc_alexnet.caffemodel'
+        model_input = caffe_root + 'models/bvlc_alexnet'
+        channel_order = (2,1,0) # the reference model has channels in BGR order instead of RGB
+        output_path = stimpath + 'alexnet_features/'
+    elif cnn_oi == 'ResNet':
+        input_size = 224
+        # proto_file = caffe_root + 'models/ResNet-152/ResNet-152-deploy.prototxt'
+        # model_file = caffe_root + 'models/ResNet-152/ResNet-152-model.caffemodel'
+        # model_input = caffe_root + 'models/ResNet-152'
+        proto_file = '/om/user/rishir/caffe/models/ResNet-50/ResNet-50-deploy.prototxt'
+        model_file = '/om/user/rishir/caffe/models/ResNet-50/ResNet-50-model.caffemodel'
+        model_input = '/om/user/rishir/caffe/models/ResNet-50'
+        channel_order = (2,1,0) # the reference model has channels in BGR order instead of RGB
+        output_path = stimpath + 'resnet152_features/'
 
     sys.path.insert(0, caffe_root + 'python')
     model_call = '/om/user/shayo/caffe/caffe/scripts/download_model_binary.py ' + model_input
@@ -112,8 +149,9 @@ def run_model(stimpath, cnn_oi='VGG_S'):
     print("There are "+str(nstim)+ " files")
     
     net, transformer, output_path = get_net(stimpath, cnn_oi)
-    compute_layers = {'fc6', 'fc7', 'fc8'}
-    layer_dim = {'fc6':4096, 'fc7':4096, 'fc8':1000}
+
+    compute_layers = layers_oi[cnn_oi]
+    layer_dim = {'conv5': 43264,'fc6':4096, 'fc7':4096, 'fc8':1000, 'pool5/7x7_s1':1024, 'fc1000':1000}
     
     features_perlayer = {}
     for layer in compute_layers:
@@ -132,7 +170,8 @@ def run_model(stimpath, cnn_oi='VGG_S'):
         out = net.forward()
         for layer in compute_layers:
             outdata = net.blobs[layer].data
-            features_perlayer[layer][indices[i]:indices[i+1], :] = outdata
+	    tmpdata = np.reshape(outdata, (BATCHSIZE, dim))
+            features_perlayer[layer][indices[i]:indices[i+1], :] = tmpdata
         
     return features_perlayer, meta, output_path
 
@@ -141,7 +180,7 @@ def format_features(stimpath, nreps=9):
     output_path = stimpath + 'caffe_features/'
     nstim = len(meta)
     compute_layers = ['fc6', 'fc7', 'fc8']
-    layer_dim = {'fc6':4096, 'fc7':4096, 'fc8':1000}
+    layer_dim = {'fc6':4096, 'fc7':4096, 'fc8':1000, 'icp9_out':205}
 
     for layer in compute_layers:
         features = np.zeros((nstim,0,layer_dim[layer]))
@@ -175,7 +214,10 @@ def run_one(stimpath, cnn_oi):
     features_perlayer, meta, output_path = run_model(stimpath=stimpath, cnn_oi=cnn_oi)
     save_features(features_perlayer, meta, cnn_oi, output_path, repindex=None)
 
+# run_one(stimpath=STIMPATH_ONLYRXY, cnn_oi='GoogLeNet')
+# run_one(stimpath=STIMPATH_ONLYRXZ, cnn_oi='GoogLeNet')
+# run_one(stimpath=STIMPATH_ONLYRYZ, cnn_oi='GoogLeNet')
 
-run_one(stimpath=STIMPATH_ALPHALOWVAR, cnn_oi='caffe_reference')
-run_one(stimpath=STIMPATH_ALPHALOWVAR, cnn_oi='VGG_S')
-
+run_one(stimpath=STIMPATH_HVM, cnn_oi='AlexNet')
+# run_one(stimpath=STIMPATH_HVM, cnn_oi='VGG_S')
+# run_one(stimpath=STIMPATH_HVM, cnn_oi='GoogLeNet')
