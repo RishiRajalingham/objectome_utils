@@ -115,6 +115,7 @@ def getClassifierRecord(features_task, meta_task, n_splits=2, classifiertype='sv
     return utils.compute_metric_base(features_task, meta_task, evalc, attach_models=True, return_splits=True)
 
 def runClassifierRecord(features, meta, rec, classifiertype='svm'):
+    # rerun learned classifiers on (modified) features
     splits = rec['splits'][0]
     rec_test = {'split_results':[], 'splits':rec['splits']}
     metric_kwargs = copy.deepcopy(METRIC_KWARGS[classifiertype]) 
@@ -196,7 +197,14 @@ def testFeatures_base(features, meta, task, objects_oi=None, features_s=None, ns
     if features_s != None:
         trials_s = format_trials_var(trials_s)
 
-    return performance, performance_s, trials, trials_s
+    rec = {
+        'performance':performance,
+        'performance_s':performance_s,
+        'trials_dict':trials_dict,
+        'trials':trials,
+        'trials_s':trials_s
+    }
+    return rec
         
 def testFeatures(all_features, all_metas, features_oi, objects_oi):
     if type(objects_oi) is dict:

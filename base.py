@@ -101,8 +101,21 @@ def objectome_meta():
 def objectome_stimpath():
     return '/mindhive/dicarlolab/u/rishir/stimuli/objectome64s100/'
 
-""" Utilities relating to objectome objects"""
 
+""" General utilities """
+
+def concatenate_dictionary(dict_tuple, fns=None):
+    concat_dict = {}
+    if fns == None:
+        fns = dict_tuple[0].keys()
+    for fn in fns:
+        concat_dict[fn] = []
+        for dict_ in dict_tuple:
+            concat_dict[fn] = concat_dict[fn] + list(dict_[fn])
+    return concat_dict
+
+
+""" Utilities relating to objectome objects"""
 
 CANONICAL_ANGLES_obj24_old = {
     ('flarenut_spanner'):           {'rxy':0,   'rxz':0,   'ryz':90},

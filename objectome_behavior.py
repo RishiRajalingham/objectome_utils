@@ -36,7 +36,7 @@ def get_numbered_field(attribute):
 
 class psychophysDatasetObject(object):
     
-    def __init__(self, collection, selector, mongo_reload=False):
+    def __init__(self, collection, selector, meta=None, mongo_reload=False):
         if mongo_reload:
             conn = pymongo.Connection(port = 22334, host = 'localhost')
             db = conn.mturk
@@ -47,35 +47,71 @@ class psychophysDatasetObject(object):
             self.collection = collection
             self.splitby = 'id'
             self.data = data
-            self.meta = obj.hvm_meta()
+            self.meta = meta
             self.get_data()
-            self.rec = []
-            # self.get_behavioral_metrics()
-
             self.backup_to_disk()
         else:
             self.collection = collection
             self.load_from_disk()
             print 'Loaded from local mongo backup...'    
     
+    def backup_to_disk(self):
+        BKFN = self.collection + '_bkp.pkl' #+ time.strftime("%m%y")
+        dat = {
+        'collection':self.collection,
+        'data':self.data,
+        'trials':self.trials,
+        'meta':self.meta,
+        'splitby':self.splitby
+        }
+        with open(os.path.join(BKPDATAPATH, BKFN), 'wb') as _f:
+            pk.dump(dat, _f)
+        print 'Backed up to ' + BKFN
+
+    def load_from_disk(self):
+        BKFN = self.collection + '_bkp.pkl' #+ time.strftime("%m%y")
+        with open(os.path.join(BKPDATAPATH, BKFN), 'r') as _f:
+            dat = pk.load(_f)
+        self.collection = dat['collection']
+        self.data = dat['data']
+        self.trials = dat['trials']
+        trial_keys = self.trials.keys()
+        for tk in trial_keys:
+            self.trials[tk] = np.array(self.trials[tk])
+        self.meta = dat['meta']
+        self.splitby = dat['splitby']
+        return
+
     def get_data(self): 
         trials =  {'sample_obj':[], 'dist_obj':[], 'choice':[], 'id':[],
             'WorkerID':[], 'AssignmentID':[]}
+        obj_oi = np.unique(self.meta['obj'])
+        img_oi = np.unique(self.meta['id'])
+
         for subj in self.data: 
-            for r,i in zip(subj['Response'], subj['ImgData']):
-                s = i['Sample']
-                t = i['Test']
-                s_obj = s['obj']
-                t_obj = [t_['obj'] for t_ in t]
-                
-                trials['id'].append(s['id'])
-                trials['sample_obj'].append(s_obj)
-                d_obj = [t_ for t_ in t_obj if t_ != s_obj]
-                trials['dist_obj'].append(d_obj) 
-                resp = t_obj[r]
-                trials['choice'].append(resp)
-                trials['WorkerID'].append(subj['WorkerID'])
-                trials['AssignmentID'].append(subj['AssignmentID'])
+            for r,i,ss in zip(subj['Response'], subj['ImgData'], subj['StimShown']):
+                if len(i) > 1:
+                    s = i['Sample']
+                    t = i['Test']
+                    s_id = s['id']
+                    s_obj = s['obj']
+                    t_obj = [t_['obj'] for t_ in t]
+                    d_obj = [t_ for t_ in t_obj if t_ != s_obj]
+                    resp = t_obj[r]
+                else: #backwards compatibility with previous mturkutils
+                    s_id = i[0]['id']
+                    s_obj = i[0]['obj']
+                    t_obj = [strip_objectomeFileName(fn) for fn in ss[1:]]
+                    d_obj = [t_ for t_ in t_obj if t_ != s_obj]
+                    resp = strip_objectomeFileName(r) 
+
+                if  (s_id in img_oi) & (d_obj in obj_oi):
+                    trials['dist_obj'].append(d_obj) 
+                    trials['id'].append(s_id)
+                    trials['sample_obj'].append(s_obj)
+                    trials['choice'].append(resp)
+                    trials['WorkerID'].append(subj['WorkerID'])
+                    trials['AssignmentID'].append(subj['AssignmentID'])
 
         trials_keys = trials.keys()
         for fk in trials_keys:
@@ -134,36 +170,17 @@ class psychophysDatasetObject(object):
         self.rec = rec
         return 
 
-    def backup_to_disk(self):
-        BKFN = self.collection + '_bkp.pkl' #+ time.strftime("%m%y")
-        dat = {
-        'collection':self.collection,
-        'data':self.data,
-        'trials':self.trials,
-        'rec':self.rec,
-        'meta':self.meta,
-        'splitby':self.splitby
-        }
-        with open(os.path.join(BKPDATAPATH, BKFN), 'wb') as _f:
-            pk.dump(dat, _f)
-        print 'Backed up to ' + BKFN
-
-    def load_from_disk(self):
-        BKFN = self.collection + '_bkp.pkl' #+ time.strftime("%m%y")
-        with open(os.path.join(BKPDATAPATH, BKFN), 'r') as _f:
-            dat = pk.load(_f)
-        self.collection = dat['collection']
-        self.data = dat['data']
-        self.trials = dat['trials']
-        trial_keys = self.trials.keys()
-	for tk in trial_keys:
-	    self.trials[tk] = np.array(self.trials[tk])
-	self.rec = dat['rec']
-        self.meta = dat['meta']
-        self.splitby = dat['splitby']
-        return
-
     """ Metrics and comparison utilities """
+
+
+def composite_dataset(imageset='objectome24'):
+    collections = ['objectome64', 'monkobjectome', 'objectome_imglvl']
+    fns = ['sample_obj', 'id', 'dist_obj', 'choice']
+    trials = []
+    for col in collections:
+        dset = obj.psychophysDatasetObject(col, {}, meta, mongo_reload=False)
+        trials.append(dset.trials)
+    return obj.concatenate_dictionary(trials, fns)
 
 def nnan_consistency(A,B):
     ind = np.isfinite(A) & np.isfinite(B)
