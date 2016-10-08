@@ -95,8 +95,12 @@ def hvm_meta():
 def hvm_stimpath():
     return '/mindhive/dicarlolab/u/rishir/stimuli/hvm/'
     
-def objectome_meta():
+def objectome64_meta():
     return pk.load(open('/mindhive/dicarlolab/u/rishir/stimuli/objectome64s100/metadata.pkl', 'r'))
+
+def objectome24_meta():
+    return pk.load(open('/mindhive/dicarlolab/u/rishir/stimuli/objectome24s100/metadata.pkl', 'r'))
+
 
 def objectome_stimpath():
     return '/mindhive/dicarlolab/u/rishir/stimuli/objectome64s100/'

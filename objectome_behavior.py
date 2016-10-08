@@ -22,8 +22,8 @@ from sklearn.metrics import confusion_matrix
 from scipy.stats.mstats import zscore
 
 
-
 BKPDATAPATH = '/mindhive/dicarlolab/u/rishir/monkey_objectome/human_behaviour/data/mongodb_bkp/'
+
 def get_numbered_field(attribute):
     attr_idxs = {}            
     attr_index = []
@@ -37,14 +37,16 @@ def get_numbered_field(attribute):
 class psychophysDatasetObject(object):
     
     def __init__(self, collection, selector, meta=None, mongo_reload=False):
-        if mongo_reload:
+        
+        self.collection = collection
+        self.collection_backup = BKPDATAPATH + self.collection + '_bkp.pkl'
+
+        if mongo_reload | (not os.path.isfile(self.collection_backup)) :
             conn = pymongo.Connection(port = 22334, host = 'localhost')
             db = conn.mturk
             col = db[collection]
             data = list(col.find(selector))
             print 'Loaded from mongoDB ...'
-
-            self.collection = collection
             self.splitby = 'id'
             self.data = data
             self.meta = meta
@@ -56,7 +58,6 @@ class psychophysDatasetObject(object):
             print 'Loaded from local mongo backup...'    
     
     def backup_to_disk(self):
-        BKFN = self.collection + '_bkp.pkl' #+ time.strftime("%m%y")
         dat = {
         'collection':self.collection,
         'data':self.data,
@@ -64,13 +65,12 @@ class psychophysDatasetObject(object):
         'meta':self.meta,
         'splitby':self.splitby
         }
-        with open(os.path.join(BKPDATAPATH, BKFN), 'wb') as _f:
+        with open(self.collection_backup, 'wb') as _f:
             pk.dump(dat, _f)
-        print 'Backed up to ' + BKFN
+        print 'Backed up to ' + self.collection_backup
 
     def load_from_disk(self):
-        BKFN = self.collection + '_bkp.pkl' #+ time.strftime("%m%y")
-        with open(os.path.join(BKPDATAPATH, BKFN), 'r') as _f:
+        with open(self.collection_backup, 'r') as _f:
             dat = pk.load(_f)
         self.collection = dat['collection']
         self.data = dat['data']
@@ -173,14 +173,19 @@ class psychophysDatasetObject(object):
     """ Metrics and comparison utilities """
 
 
-def composite_dataset(imageset='objectome24'):
-    collections = ['objectome64', 'monkobjectome', 'objectome_imglvl']
-    fns = ['sample_obj', 'id', 'dist_obj', 'choice']
+def composite_dataset(dataset='objectome24'):
+    if dataset == 'objectome24':
+        collections = ['objectome64', 'objectome_imglvl', 'ko_obj24_basic_2ways', 'monkobjectome']
+        meta = obj.objectome24_meta()
+    fns = ['sample_obj', 'id', 'dist_obj', 'choice', 'WorkerID']
     trials = []
     for col in collections:
         dset = obj.psychophysDatasetObject(col, {}, meta, mongo_reload=False)
         trials.append(dset.trials)
-    return obj.concatenate_dictionary(trials, fns)
+
+    # all_trials = obj.concatenate_dictionary(trials, fns)
+    
+    return trials, collections
 
 def nnan_consistency(A,B):
     ind = np.isfinite(A) & np.isfinite(B)
