@@ -92,6 +92,14 @@ SYMBOLS_all = SYMBOLS_alpharoman + SYMBOLS_alphaarab + SYMBOLS_numbersarab
 def hvm_meta():
     return pk.load(open('/mindhive/dicarlolab/u/rishir/stimuli/hvm/metadata.pkl', 'r'))
 
+def hvm10_meta():
+    meta = hvm_meta()
+    t = np.nonzero([m['obj'] in HVM_10 for m in meta])[0]
+    meta_2 = meta[t]
+    # for m in meta_2:
+    #     m['id'] = m['_id'].split('_')[-2]
+    return meta_2
+
 def hvm_stimpath():
     return '/mindhive/dicarlolab/u/rishir/stimuli/hvm/'
     
@@ -104,19 +112,6 @@ def objectome24_meta():
 
 def objectome_stimpath():
     return '/mindhive/dicarlolab/u/rishir/stimuli/objectome64s100/'
-
-
-""" General utilities """
-
-def concatenate_dictionary(dict_tuple, fns=None):
-    concat_dict = {}
-    if fns == None:
-        fns = dict_tuple[0].keys()
-    for fn in fns:
-        concat_dict[fn] = []
-        for dict_ in dict_tuple:
-            concat_dict[fn] = concat_dict[fn] + list(dict_[fn])
-    return concat_dict
 
 
 """ Utilities relating to objectome objects"""

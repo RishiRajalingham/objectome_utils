@@ -10,6 +10,7 @@ import scipy.io as io
 import cPickle as pk
 import numpy as np
 import skdata.larray as larray
+import tabular as tb
 
 import dldata.metrics.utils as utils
 import dldata.metrics.classifier as classifier
@@ -180,31 +181,33 @@ def testFeatures_base(features, meta, task, objects_oi=None, features_s=None, ns
     
     rec = getClassifierRecord(features_task, meta_task, nsplits)
     performance, trials_dict, trials = getBehavioralPatternFromRecord(rec, meta_task, obj_idx)
+
+    return trials_dict
     
-    trials_s, performance_s = {}, {}
-    if features_s != None:
-        for fs in features_s:
-            if not (fs in performance_s):
-                performance_s[fs], trials_s[fs] = [],[]
-            features_s_ = np.squeeze(features_s[fs]['features'][task,:])
-            rec_s = runClassifierRecord(features, meta, rec)
-            perf_ts_, trials_s_dict, trial_s_ = getBehavioralPatternFromRecord(rec_s, meta, obj_idx)
-            performance_s[fs].extend([perf_tmp])
-            trials_s[fs].extend(trial_s_)
+    # trials_s, performance_s = {}, {}
+    # if features_s != None:
+    #     for fs in features_s:
+    #         if not (fs in performance_s):
+    #             performance_s[fs], trials_s[fs] = [],[]
+    #         features_s_ = np.squeeze(features_s[fs]['features'][task,:])
+    #         rec_s = runClassifierRecord(features, meta, rec)
+    #         perf_ts_, trials_s_dict, trial_s_ = getBehavioralPatternFromRecord(rec_s, meta, obj_idx)
+    #         performance_s[fs].extend([perf_tmp])
+    #         trials_s[fs].extend(trial_s_)
 
-    performance = np.array(performance)
-    trials = format_trials_var(trials)
-    if features_s != None:
-        trials_s = format_trials_var(trials_s)
+    # performance = np.array(performance)
+    # trials = format_trials_var(trials)
+    # if features_s != None:
+    #     trials_s = format_trials_var(trials_s)
 
-    rec = {
-        'performance':performance,
-        'performance_s':performance_s,
-        'trials_dict':trials_dict,
-        'trials':trials,
-        'trials_s':trials_s
-    }
-    return rec
+    # rec = {
+    #     'performance':performance,
+    #     'performance_s':performance_s,
+    #     'trials_dict':trials_dict,
+    #     'trials':trials,
+    #     'trials_s':trials_s
+    # }
+    # return rec
         
 def testFeatures(all_features, all_metas, features_oi, objects_oi):
     if type(objects_oi) is dict:
@@ -258,45 +261,45 @@ def computePairWiseConfusions(objects_oi, OUTPATH=None, IMGPATH=None):
 
 
 """ New stuff? """
-def getBehavioralMetrics_base(features, meta, tasks):
-    trials =  {'sample_obj':[], 'dist_obj':[], 'choice':[], 'id':[]}
-    for task in tasks:
-        features_task = np.squeeze(features[task,:])
-        meta_task = meta[task][0]
-        rec_ = getClassifierRecord(features_task, meta_task)
-        beh_ = getBehavioralPatternFromRecord(rec_, meta_task)
-        [trials[fn].extend(beh_[fn]) for fn in trials]
+# def getBehavioralMetrics_base(features, meta, tasks):
+#     trials =  {'sample_obj':[], 'dist_obj':[], 'choice':[], 'id':[]}
+#     for task in tasks:
+#         features_task = np.squeeze(features[task,:])
+#         meta_task = meta[task][0]
+#         rec_ = getClassifierRecord(features_task, meta_task)
+#         beh_ = getBehavioralPatternFromRecord(rec_, meta_task)
+#         [trials[fn].extend(beh_[fn]) for fn in trials]
 
-    trials_keys = trials.keys()
-    for fk in trials_keys:
-        trials[fk] = np.array(trials[fk])
+#     trials_keys = trials.keys()
+#     for fk in trials_keys:
+#         trials[fk] = np.array(trials[fk])
 
-    return obj.compute_behavioral_metrics(trials, meta)
+#     return obj.compute_behavioral_metrics(trials, meta)
 
-def getBehavioralMetrics(features, meta, tasks):
-    s = features.shape
-    nim, nrep, nfeat = s[0],s[1],s[2]
-    rec = {'I1':[[],[]]}
-    niter = 10
+# def getBehavioralMetrics(features, meta, tasks):
+#     s = features.shape
+#     nim, nrep, nfeat = s[0],s[1],s[2]
+#     rec = {'I1':[[],[]]}
+#     niter = 10
 
-    for itr in range(niter):
-        trials =  {'sample_obj':[], 'dist_obj':[], 'choice':[], 'id':[]}
+#     for itr in range(niter):
+#         trials =  {'sample_obj':[], 'dist_obj':[], 'choice':[], 'id':[]}
 
-        nrep_split = int(nrep/2)
-        feature_splits = {
-            'split1':np.zeros((nim, nrep_split, nfeat)),
-            'split2':np.zeros((nim, nrep_split, nfeat))}
-        for im in range(nim):
-            tmp = range(nrep)
-            np.random.shuffle(tmp)
-            feature_splits['split1'][im,:,:] = features[im,tmp[:nrep_split],:]
-            feature_splits['split2'][im,:,:] = features[im,tmp[-nrep_split:],:]
+#         nrep_split = int(nrep/2)
+#         feature_splits = {
+#             'split1':np.zeros((nim, nrep_split, nfeat)),
+#             'split2':np.zeros((nim, nrep_split, nfeat))}
+#         for im in range(nim):
+#             tmp = range(nrep)
+#             np.random.shuffle(tmp)
+#             feature_splits['split1'][im,:,:] = features[im,tmp[:nrep_split],:]
+#             feature_splits['split2'][im,:,:] = features[im,tmp[-nrep_split:],:]
         
         
-        rec['I1'][0].append( getBehavioralMetrics_base(feature_splits['split1'].mean(1), meta, tasks)['I1'])
-        rec['I1'][1].append( getBehavioralMetrics_base(feature_splits['split2'].mean(1), meta, tasks)['I1'])
+#         rec['I1'][0].append( getBehavioralMetrics_base(feature_splits['split1'].mean(1), meta, tasks)['I1'])
+#         rec['I1'][1].append( getBehavioralMetrics_base(feature_splits['split2'].mean(1), meta, tasks)['I1'])
 
-    return rec
+#     return rec
 
 def run_machine_features():
     outpath = '/mindhive/dicarlolab/u/rishir/models/hvm10/' 
