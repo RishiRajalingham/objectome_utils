@@ -115,6 +115,7 @@ def get_monkeyturk_data(dataset='objectome24'):
     datmat = io.loadmat(data_path)
     uobjs = obj.models_combined24
 
+    col_data_seg = {}
     trial_records = []
     subjs = ['Manto', 'Zico', 'Picasso', 'Nano', 'Magneto']
     for sub in subjs:
@@ -129,13 +130,33 @@ def get_monkeyturk_data(dataset='objectome24'):
 
             rec_curr = (s_obj,) + (d_obj,) + (resp,) + (s_id,) + (workid,) + (assnid,) 
             trial_records.append(rec_curr)
-    
-    return tb.tabarray(records=trial_records, names=KW_NAMES, formats=KW_FORMATS)
 
-def get_model_data(dataset='objectome24', model_name='VGG'):
-    getBehavioralPatternFromRecord(rec, meta, obj_idx=None, model_name='', classifiertype='svm')
+    col_data_seg['all'] = tb.tabarray(records=trial_records, names=KW_NAMES, formats=KW_FORMATS)
+    for sub in subjs:
+        t = col_data_seg['all']['WorkerID'] == sub
+        col_data_seg[sub] = col_data_seg['all'][t]
+    return col_data_seg
 
-def composite_dataset(dataset='objectome24', threshold=10000, mongo_reload=False):
+def get_model_data(dataset='objectome24'):
+    if dataset == 'objectome24':
+        featurespath = '/mindhive/dicarlolab/u/rishir/stimuli/objectome24s100/features/'
+
+    meta = obj.objectome24_meta()
+    all_metas, all_features = {}, {}
+    # f_oi = ['ALEXNET_fc6', 'ALEXNET_fc8', 'RESNET101_conv5', 'VGG_fc6', 'VGG_fc8', 'ALEXNET_fc7', 'GOOGLENET_pool5', 'V1', 'VGG_fc7']
+    f_oi = ['RESNET101_conv5']
+    for f in f_oi:
+        data = np.load(featurespath + f + '.npy')
+        all_features[f] = data
+        all_metas[f] = meta
+
+    return obj.testFeatures(all_features, all_metas, f_oi, obj.models_combined24)    
+
+# def get_neural_data(dataset='objectome24'):
+
+
+
+def composite_dataset(dataset='objectome24', threshold=12000, mongo_reload=False):
     if dataset == 'objectome24':
         collections = ['objectome64', 'objectome_imglvl', 'ko_obj24_basic_2ways', 'monkobjectome']
         meta = obj.objectome24_meta()
@@ -163,7 +184,6 @@ def composite_dataset(dataset='objectome24', threshold=10000, mongo_reload=False
 
     return col_data_seg
 
-
 """ Behavioral metrics and utils """
 def get_confusion_patterns(trials, uobjs, uimgs):
     """ returns the matrix (nimages, ntasks) of choice counts """
@@ -189,26 +209,80 @@ def dprime_from2x2(C):
     dp = norm.ppf(hr_,0,1) - norm.ppf(fp_,0,1)
     return np.clip(dp, -maxVal, maxVal)
 
-def compute_behavioral_metrics(trials, meta, compute_metrics={'I1_dprime'}, O2_normalize=True, niter=100):
-    ntrials = trials.shape[0]
-    rec_splithalves = []
-    for i in range(niter):
-        tr = np.arange(ntrials)
-        random.shuffle(tr)
-        rec = []
-        rec.append(compute_behavioral_metrics_base(trials[tr[:int(ntrials/2)]], meta, compute_metrics=compute_metrics, O2_normalize=O2_normalize))
-        rec.append(compute_behavioral_metrics_base(trials[tr[int(ntrials/2):]], meta, compute_metrics=compute_metrics, O2_normalize=O2_normalize))
-        rec_splithalves.append(rec)
-    return rec_splithalves
+def compute_behavioral_metrics(trials, meta, compute_metrics={'I1_dprime'}, O2_normalize=True, niter=20, rec_precomputed=None):
+    rec_splithalves = {
+        'O2_dprime':[],'I2_hitrate':[],'I2_dprime':[],
+        'I1_hitrate':[],'I1_hitrate_c':[],'I1_hitrate_z':[],
+        'I1_dprime':[],'I1_dprime_c':[],'I1_dprime_z':[]
+    }
 
-def compute_behavioral_metrics_base(trials, meta, compute_metrics={'I1_dprime'}, O2_normalize=True):
+    imgdata = []
+        
+    if isinstance(trials, list):
+        niter = len(trials)
+    
+    for i in range(niter):
+        rec = []
+        if isinstance(trials, list): # trial splits are precomputed over the raw data (e.g. reps)
+            sh1,id1 = compute_behavioral_metrics_base(trials[i][0], meta, compute_metrics=compute_metrics, 
+                O2_normalize=O2_normalize, rec_precomputed=rec_precomputed)
+            sh2,id2 = compute_behavioral_metrics_base(trials[i][1], meta, compute_metrics=compute_metrics, 
+                O2_normalize=O2_normalize, rec_precomputed=rec_precomputed)
+        else: # trials are split into random halves
+            ntrials = trials.shape[0]
+            tr = np.arange(ntrials)
+            random.shuffle(tr)
+            tr1 = tr[:int(len(tr)/2)]
+            tr2 = tr[int(len(tr)/2):]
+            sh1,id1 = compute_behavioral_metrics_base(trials[tr1], meta, compute_metrics=compute_metrics, 
+                O2_normalize=O2_normalize, rec_precomputed=rec_precomputed)
+            sh2,id2 = compute_behavioral_metrics_base(trials[tr2], meta, compute_metrics=compute_metrics,
+                O2_normalize=O2_normalize, rec_precomputed=rec_precomputed)
+
+        for fnk in rec_splithalves.keys():
+	    if fnk not in sh1.keys():
+		continue
+            rec_tmp = []
+            rec_tmp.append(sh1[fnk])
+            rec_tmp.append(sh2[fnk])
+            rec_splithalves[fnk].append(rec_tmp)
+        
+        imgdata_tmp = []
+        imgdata_tmp.append(id1)
+        imgdata_tmp.append(id2)
+
+        imgdata.append(imgdata_tmp)
+
+
+    return rec_splithalves, imgdata
+
+def compute_behavioral_metrics_base(trials, meta, compute_metrics={'I1_dprime'}, O2_normalize=True, rec_precomputed=None):
     uobjs = list(set(trials['sample_obj']))
     uimgs = [m['id'] for m in meta if m['obj'] in uobjs]
     imgdata = get_confusion_patterns(trials, uobjs, uimgs)
     nimgs = len(uimgs)
     nobjs = len(uobjs)
 
-    rec = {'imgdata':imgdata}
+    if rec_precomputed == None:
+        rec = {}
+    else:
+        compute_metrics = [cm for cm in compute_metrics if cm not in rec_precomputed.keys()]
+        rec = rec_precomputed
+
+    if ('O2_dprime' in compute_metrics):
+        rec['O2_dprime'] = np.ones((nobjs,nobjs)) * np.nan
+        for ii in range(nobjs):
+            ind_i = np.nonzero(imgdata['true'][:,ii])[0]
+            for jj in range(ii+1,nobjs):
+                ind_j = np.nonzero(imgdata['true'][:,jj])[0]
+                
+                hitmat_curr = np.zeros((2,2))
+                hitmat_curr[0,0] = np.sum(imgdata['choice'][ind_i,ii])
+                hitmat_curr[0,1] = np.sum(imgdata['choice'][ind_i,jj])
+                hitmat_curr[1,0] = np.sum(imgdata['choice'][ind_j,ii])
+                hitmat_curr[1,1] = np.sum(imgdata['choice'][ind_j,jj])
+
+                rec['O2_dprime'][ii,jj] = obj.dprime_from2x2(hitmat_curr)
 
     if ('I1_hitrate' in compute_metrics) | ('I2_hitrate' in compute_metrics):
         hitrates_ = imgdata['choice'] / (1.0*imgdata['selection'])
@@ -216,7 +290,6 @@ def compute_behavioral_metrics_base(trials, meta, compute_metrics={'I1_dprime'},
         hitrates_[imgdata['true'] > 0] = np.nan
         rec['I1_hitrate'] = 1.0 - np.nanmean(hitrates_,1)
         
-
     if ('I1_dprime' in compute_metrics) | ('I2_dprime' in compute_metrics):
         hit_matrix = imgdata['choice']
         rec['I1_dprime'] = np.zeros((nimgs,1))
@@ -244,18 +317,23 @@ def compute_behavioral_metrics_base(trials, meta, compute_metrics={'I1_dprime'},
                     rec['I2_dprime'][ii,jj] = obj.dprime_from2x2(hitmat_curr[:,[t,jj]])
 
     if O2_normalize:
-        for fn in compute_metrics:
-            metric = rec[fn]
-            metric_z = np.zeros(metric.shape)
-            for jj in range(nobjs):
-                t_i = np.nonzero(imgdata['true'][:,jj] > 0)[0]
-                metric_z[t_i] = zscore(metric[t_i])
-            rec[fn + '_z'] = metric_z
-    
+        for fn in rec.keys():
+            if 'I1' in fn:
+                metric = rec[fn]
+                metric_z = np.zeros(metric.shape)
+                metric_c = np.zeros(metric.shape)
+                for jj in range(nobjs):
+                    t_i = np.nonzero(imgdata['true'][:,jj] > 0)[0]
+                    metric_z[t_i] = zscore(metric[t_i])
+                    metric_c[t_i] = metric[t_i] - np.mean(metric[t_i])
+                rec[fn + '_z'] = metric_z
+                rec[fn + '_c'] = metric_c
+        
     rec['uimgs'] = uimgs
     rec['uobjs'] = uobjs
 
-    return rec
+
+    return rec, imgdata
 
 
 
