@@ -11,6 +11,7 @@ import cPickle as pk
 import numpy as np
 import skdata.larray as larray
 import tabular as tb
+import random
 
 import dldata.metrics.utils as utils
 import dldata.metrics.classifier as classifier
@@ -87,7 +88,7 @@ def sampleFeatures(features, noise_model=None, subsample=None):
         
 """ ********** Classifier functions ********** """
 
-def getClassifierRecord(features_task, meta_task, n_splits=2, classifiertype='svm'):
+def getClassifierRecord(features_task, meta_task, n_splits=100, classifiertype='svm'):
     if len(meta_task) == 1:
         meta_task = meta_task[0]
     features_task = np.squeeze(features_task)
@@ -100,6 +101,8 @@ def getClassifierRecord(features_task, meta_task, n_splits=2, classifiertype='sv
     npc_test = npc/2
     metric_kwargs = METRIC_KWARGS[classifiertype]
     
+    
+
     evalc = {'ctypes': [('dp_standard', 'dp_standard', {'kwargs': {'error': 'std'}})],
          'labelfunc': 'obj',
          'metric_kwargs': metric_kwargs,
@@ -109,6 +112,7 @@ def getClassifierRecord(features_task, meta_task, n_splits=2, classifiertype='sv
          'npc_validate': 0,
          'num_splits': n_splits,
          'split_by': 'obj',
+         'split_seed': random.seed(),
          'test_q': test_q,
          'train_q': train_q,
          'use_validation': False}
@@ -140,8 +144,7 @@ def runClassifierRecord(features, meta, rec, classifiertype='svm'):
 
 def getBehavioralPatternFromRecord(rec, meta, obj_idx=None):
     nsplits = len(rec['splits'][0])
-    trials_dict =  {'sample_obj':[], 'dist_obj':[], 'choice':[], 'id':[]}
-    trials, performance = [],[]
+    trial_records = []
 
     for s_ind, split in enumerate(rec['splits']):
         labelset = rec['split_results'][s_ind]['labelset']
@@ -151,25 +154,17 @@ def getBehavioralPatternFromRecord(rec, meta, obj_idx=None):
         distr_label = [np.setdiff1d(labelset,pl)[0] for pl in meta[split_ind]['obj']]
         imgid = meta[split_ind]['id']
 
-        perf = (pred_label == true_label).sum() / (len(pred_label)*1.0)
-        performance.extend([perf])
+        for i in range(len(imgid)):
+            rec_curr = (true_label[i],) + (distr_label[i],) + (pred_label[i],) + (imgid[i],) + ('ModelID',) + ('ModelSpec',) 
+            trial_records.append(rec_curr)
         
-        trials_dict['choice'].extend(pred_label)
-        trials_dict['sample_obj'].extend(true_label)
-        trials_dict['dist_obj'].extend(distr_label)
-        trials_dict['id'].extend(imgid)
+    KW_NAMES = ['sample_obj', 'dist_obj', 'choice', 'id', 'WorkerID', 'AssignmentID']
+    KW_FORMATS = ['|S40','|S40','|S40','|S40','|S40','|S40']
 
-        if obj_idx != None:
-            pred_labels_i = np.array([obj_idx[pl] for pl in pred_label])
-            actual_labels_i = np.array([obj_idx[pl] for pl in true_label])
-            distr_labels_i = np.array([obj_idx[pl] for pl in distr_label])
-            imgid_i = np.array([obj.get_index_MWorksRelative(pl) for pl in imgid])
-            trials.extend(np.array([actual_labels_i, actual_labels_i, distr_labels_i, pred_labels_i, imgid_i]).T)
-    performance = np.array(performance).mean(0)
-    trials = np.array(trials)
-    return performance, trials_dict, trials
+    return tb.tabarray(records=trial_records, names=KW_NAMES, formats=KW_FORMATS)
 
-def testFeatures_base(features, meta, task, objects_oi=None, features_s=None, nsplits=2):
+
+def testFeatures_base(features, meta, task, objects_oi=None, features_s=None, nsplits=100):
     features_task = np.squeeze(features[task,:])
     meta_task = meta[task]
     if len(meta_task) == 1:
@@ -180,34 +175,81 @@ def testFeatures_base(features, meta, task, objects_oi=None, features_s=None, ns
         obj_idx[m] = i
     
     rec = getClassifierRecord(features_task, meta_task, nsplits)
-    performance, trials_dict, trials = getBehavioralPatternFromRecord(rec, meta_task, obj_idx)
+    return getBehavioralPatternFromRecord(rec, meta_task, obj_idx)
 
-    return trials_dict
+   
+        
+
+# def getBehavioralPatternFromRecord(rec, meta, obj_idx=None):
+#     nsplits = len(rec['splits'][0])
+#     trials_dict =  {'sample_obj':[], 'dist_obj':[], 'choice':[], 'id':[]}
+#     trials, performance = [],[]
+
+#     for s_ind, split in enumerate(rec['splits']):
+#         labelset = rec['split_results'][s_ind]['labelset']
+#         split_ind = rec['splits'][0][s_ind]['test']
+#         pred_label = np.array(rec['split_results'][s_ind]['test_prediction'])
+#         true_label = meta[split_ind]['obj']
+#         distr_label = [np.setdiff1d(labelset,pl)[0] for pl in meta[split_ind]['obj']]
+#         imgid = meta[split_ind]['id']
+
+#         perf = (pred_label == true_label).sum() / (len(pred_label)*1.0)
+#         performance.extend([perf])
+        
+#         trials_dict['choice'].extend(pred_label)
+#         trials_dict['sample_obj'].extend(true_label)
+#         trials_dict['dist_obj'].extend(distr_label)
+#         trials_dict['id'].extend(imgid)
+
+#         if obj_idx != None:
+#             pred_labels_i = np.array([obj_idx[pl] for pl in pred_label])
+#             actual_labels_i = np.array([obj_idx[pl] for pl in true_label])
+#             distr_labels_i = np.array([obj_idx[pl] for pl in distr_label])
+#             imgid_i = np.array([obj.get_index_MWorksRelative(pl) for pl in imgid])
+#             trials.extend(np.array([actual_labels_i, actual_labels_i, distr_labels_i, pred_labels_i, imgid_i]).T)
+#     performance = np.array(performance).mean(0)
+#     trials = np.array(trials)
+#     return performance, trials_dict, trials
+
+# def testFeatures_base(features, meta, task, objects_oi=None, features_s=None, nsplits=2):
+#     features_task = np.squeeze(features[task,:])
+#     meta_task = meta[task]
+#     if len(meta_task) == 1:
+#         meta_task = meta_task[0] # weird bug??
+
+#     obj_idx = {}
+#     for i,m in enumerate(objects_oi):
+#         obj_idx[m] = i
     
-    # trials_s, performance_s = {}, {}
-    # if features_s != None:
-    #     for fs in features_s:
-    #         if not (fs in performance_s):
-    #             performance_s[fs], trials_s[fs] = [],[]
-    #         features_s_ = np.squeeze(features_s[fs]['features'][task,:])
-    #         rec_s = runClassifierRecord(features, meta, rec)
-    #         perf_ts_, trials_s_dict, trial_s_ = getBehavioralPatternFromRecord(rec_s, meta, obj_idx)
-    #         performance_s[fs].extend([perf_tmp])
-    #         trials_s[fs].extend(trial_s_)
+#     rec = getClassifierRecord(features_task, meta_task, nsplits)
+#     trials = getBehavioralPatternFromRecord(rec, meta_task, obj_idx)
 
-    # performance = np.array(performance)
-    # trials = format_trials_var(trials)
-    # if features_s != None:
-    #     trials_s = format_trials_var(trials_s)
+#     # return trials_dict
+    
+#     trials_s, performance_s = {}, {}
+#     if features_s != None:
+#         for fs in features_s:
+#             if not (fs in performance_s):
+#                 performance_s[fs], trials_s[fs] = [],[]
+#             features_s_ = np.squeeze(features_s[fs]['features'][task,:])
+#             rec_s = runClassifierRecord(features, meta, rec)
+#             perf_ts_, trials_s_dict, trial_s_ = getBehavioralPatternFromRecord(rec_s, meta, obj_idx)
+#             performance_s[fs].extend([perf_tmp])
+#             trials_s[fs].extend(trial_s_)
 
-    # rec = {
-    #     'performance':performance,
-    #     'performance_s':performance_s,
-    #     'trials_dict':trials_dict,
-    #     'trials':trials,
-    #     'trials_s':trials_s
-    # }
-    # return rec
+#     performance = np.array(performance)
+#     trials = format_trials_var(trials)
+#     if features_s != None:
+#         trials_s = format_trials_var(trials_s)
+
+#     rec = {
+#         'performance':performance,
+#         'performance_s':performance_s,
+#         'trials_dict':trials_dict,
+#         'trials':trials,
+#         'trials_s':trials_s
+#     }
+#     return rec
         
 def testFeatures(all_features, all_metas, features_oi, objects_oi):
     if type(objects_oi) is dict:
@@ -220,7 +262,11 @@ def testFeatures(all_features, all_metas, features_oi, objects_oi):
     subsample = 1000
     noise_model = None
     nsamples_noisemodel = 10
+    nsplits = 100
     result = {'objs_oi':objs_oi}
+
+    task_trials = ()
+    rec = {}
 
     for feat in features_oi:
         if feat not in all_features.keys():
@@ -228,24 +274,23 @@ def testFeatures(all_features, all_metas, features_oi, objects_oi):
         features = all_features[feat]
         meta = fix_meta(all_metas[feat])
         tasks = getBinaryTasks(meta, tasks_oi)
-        trials, performance = [], []
         print 'Running machine_objectome : ' + str(feat) + ': ' + str(features.shape)
         for isample in range(nsamples_noisemodel):
             features_sample = sampleFeatures(features, noise_model, subsample)
             for task in tasks:
-                p_, p_s_, t_, t_s_ = testFeatures_base(features_sample, meta, task, objs_oi, features_s=None, nsplits=20)
-                trials.extend(t_)
-                # performance.extend(p_)
-        trials = format_trials_var(trials)
-        result[feat] = trials
-    return result
+                trials = testFeatures_base(features_sample, meta, task, objs_oi, nsplits=nsplits)
+                task_trials = task_trials + (trials,)
+        task_trials = tb.rowstack(task_trials)
+        task_trials['WorkerID'] = feat
+        rec[feat] = task_trials
+    return task_trials
 
 """ ********** Main functions ********** """
 def computePairWiseConfusions(objects_oi, OUTPATH=None, IMGPATH=None):
     """ For a set of objects and features, run classifiers,
         and output trial structures for all 2x2 tasks.
     """
-    features_oi = ['PXLn', 'V1', 'HMAX', 'Alexnet_fc6', 'Alexnet_fc7', 'Alexnet', 'VGG_fc6', 'VGG_fc7', 'VGG', 'Googlenet']
+    features_oi = ['PXLn', 'V1', 'HMAX', 'Alexnet_fc6', 'Alexnet_fc7', 'Alexnet', 'VGG_fc6', 'VGG_fc7', 'VGG', 'Googlenet', 'Resnet']
     all_features, all_metas = obj.getAllFeatures(objects_oi, IMGPATH)
     result = testFeatures(all_features, all_metas, features_oi, objects_oi)
     

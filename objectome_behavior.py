@@ -200,6 +200,22 @@ def get_confusion_patterns(trials, uobjs, uimgs):
             'true': np.array(true)
             }
 
+def get_confusion_patterns_pertask(trials, uobjs, uimgs):
+    """ returns list of the matrix (nimages, ntasks) of choice counts """
+    nobjs = len(uobjs)
+    cmats = [[ [] for j in range(nobjs)] for i in range (nobjs)]
+    for oi in range(nobjs):
+        for oj in range(oi+1, nobjs):
+            t = select_task_trials(trials, uobjs, oi, oj)
+            cmats[oi][oj] = get_confusion_patterns(trials[t], uobjs, uimgs)
+            cmats[oj][oi] = cmats[oi][oj]
+    return cmats
+
+def select_task_trials(trials, uobjs, obj_i, obj_j):
+    t0 = (trials['sample_obj'] == uobjs[obj_i]) & (trials['dist_obj'] == uobjs[obj_j])
+    t1 = (trials['sample_obj'] == uobjs[obj_j]) & (trials['dist_obj'] == uobjs[obj_i])
+    return (t0 | t1)
+
 def dprime_from2x2(C):
     """ Input matrix C is essentially a 2x2 confusion matrix, 
     rows and columsn: [A| !A], but !A can be a vector"""
@@ -209,9 +225,35 @@ def dprime_from2x2(C):
     dp = norm.ppf(hr_,0,1) - norm.ppf(fp_,0,1)
     return np.clip(dp, -maxVal, maxVal)
 
-def compute_behavioral_metrics(trials, meta, compute_metrics={'I1_dprime'}, O2_normalize=True, niter=20, rec_precomputed=None):
+def get_obj_dprime_from_trials(trials, SIGLABEL):
+    C2x2 = np.zeros((2,2))
+    C2x2[0,0] = sum((trials['sample_obj'] == SIGLABEL) & (trials['choice'] == SIGLABEL)) #hit
+    C2x2[0,1] = sum((trials['sample_obj'] == SIGLABEL) & (trials['choice'] != SIGLABEL)) # miss
+    C2x2[1,0] = sum((trials['sample_obj'] != SIGLABEL) & (trials['choice'] == SIGLABEL)) #false alarm
+    C2x2[1,1] = sum((trials['sample_obj'] != SIGLABEL) & (trials['choice'] != SIGLABEL)) # correct rej
+    return obj.dprime_from2x2(C2x2)
+
+def get_img_dprime_from_imgdata(imgdata, img_i):
+    nobjs = imgdata['true'].shape[1]
+    t = np.nonzero(imgdata['true'][img_i,:] > 0)[0] # what obj is img_i?
+    if len(t) == 0:
+        return np.nan
+    else:
+        t = t[0]
+    t_i = np.nonzero(imgdata['true'][:,t] == 0)[0] # all negative images
+    if len(t_i) == 0:
+        return np.nan
+    ind = np.concatenate(([img_i],t_i)) # order positive + negatives
+    hitmat_curr = imgdata['choice'] / (1.0*imgdata['selection'])
+    hitmat_curr = hitmat_curr[ind,:]
+    ind2 = list(set(range(nobjs))-set([t]))
+    ind2 = np.hstack(([t], ind2)) # order positive + netatives
+    return dprime_from2x2(hitmat_curr[:,ind2])
+
+
+def compute_behavioral_metrics(trials, meta, compute_metrics={'I1_dprime'}, O2_normalize=True, niter=10, rec_precomputed=None):
     rec_splithalves = {
-        'O2_dprime':[],'I2_hitrate':[],'I2_dprime':[],
+        'O1_dprime':[],'O2_dprime':[],'I2_hitrate':[],'I2_dprime':[],
         'I1_hitrate':[],'I1_hitrate_c':[],'I1_hitrate_z':[],
         'I1_dprime':[],'I1_dprime_c':[],'I1_dprime_z':[]
     }
@@ -240,8 +282,8 @@ def compute_behavioral_metrics(trials, meta, compute_metrics={'I1_dprime'}, O2_n
                 O2_normalize=O2_normalize, rec_precomputed=rec_precomputed)
 
         for fnk in rec_splithalves.keys():
-	    if fnk not in sh1.keys():
-		continue
+    	    if fnk not in sh1.keys():
+                continue
             rec_tmp = []
             rec_tmp.append(sh1[fnk])
             rec_tmp.append(sh2[fnk])
@@ -259,31 +301,33 @@ def compute_behavioral_metrics(trials, meta, compute_metrics={'I1_dprime'}, O2_n
 def compute_behavioral_metrics_base(trials, meta, compute_metrics={'I1_dprime'}, O2_normalize=True, rec_precomputed=None):
     uobjs = list(set(trials['sample_obj']))
     uimgs = [m['id'] for m in meta if m['obj'] in uobjs]
-    imgdata = get_confusion_patterns(trials, uobjs, uimgs)
+
     nimgs = len(uimgs)
     nobjs = len(uobjs)
 
+    imgdata = get_confusion_patterns(trials, uobjs, uimgs)
+    imgdata_pertask = get_confusion_patterns_pertask(trials, uobjs, uimgs)
+    
     if rec_precomputed == None:
         rec = {}
     else:
         compute_metrics = [cm for cm in compute_metrics if cm not in rec_precomputed.keys()]
         rec = rec_precomputed
 
-    if ('O2_dprime' in compute_metrics):
+    if ('O1_dprime' in compute_metrics) | ('O2_dprime' in compute_metrics):
+        rec['O1_dprime'] = np.ones((nobjs,1)) * np.nan
         rec['O2_dprime'] = np.ones((nobjs,nobjs)) * np.nan
         for ii in range(nobjs):
-            ind_i = np.nonzero(imgdata['true'][:,ii])[0]
+            t0 = (trials['sample_obj'] == uobjs[ii])
+            t1 = (trials['dist_obj'] == uobjs[ii])
+            t = t0 | t1
+            rec['O1_dprime'][ii] = get_obj_dprime_from_trials(trials[t], uobjs[ii])
             for jj in range(ii+1,nobjs):
-                ind_j = np.nonzero(imgdata['true'][:,jj])[0]
+                t0 = (trials['sample_obj'] == uobjs[ii]) & (trials['dist_obj'] == uobjs[jj])
+                t1 = (trials['sample_obj'] == uobjs[jj]) & (trials['dist_obj'] == uobjs[ii])
+                t = t0 | t1
+                rec['O2_dprime'][ii,jj] = get_obj_dprime_from_trials(trials[t], uobjs[ii])
                 
-                hitmat_curr = np.zeros((2,2))
-                hitmat_curr[0,0] = np.sum(imgdata['choice'][ind_i,ii])
-                hitmat_curr[0,1] = np.sum(imgdata['choice'][ind_i,jj])
-                hitmat_curr[1,0] = np.sum(imgdata['choice'][ind_j,ii])
-                hitmat_curr[1,1] = np.sum(imgdata['choice'][ind_j,jj])
-
-                rec['O2_dprime'][ii,jj] = obj.dprime_from2x2(hitmat_curr)
-
     if ('I1_hitrate' in compute_metrics) | ('I2_hitrate' in compute_metrics):
         hitrates_ = imgdata['choice'] / (1.0*imgdata['selection'])
         rec['I2_hitrate'] = hitrates_
@@ -291,30 +335,21 @@ def compute_behavioral_metrics_base(trials, meta, compute_metrics={'I1_dprime'},
         rec['I1_hitrate'] = 1.0 - np.nanmean(hitrates_,1)
         
     if ('I1_dprime' in compute_metrics) | ('I2_dprime' in compute_metrics):
-        hit_matrix = imgdata['choice']
         rec['I1_dprime'] = np.zeros((nimgs,1))
         rec['I2_dprime'] = np.zeros((nimgs,nobjs))
-
         for ii in range(nimgs):
-            t = np.nonzero(imgdata['true'][ii,:] > 0)[0]
-            if len(t) == 0:
-                rec['I1_dprime'] [ii,:] = np.nan
-                continue
-            else:
-                t = t[0]
-            t_i = np.nonzero(imgdata['true'][:,t] == 0)[0]
-            ind = np.concatenate(([ii],t_i))
-            hitmat_curr = hit_matrix[ind,:]
             if ('I1_dprime' in compute_metrics):
-                ind2 = list(set(range(nobjs))-set([t]))
-                ind2 = np.hstack(([t], ind2))
-                rec['I1_dprime'] [ii,:] = obj.dprime_from2x2(hitmat_curr[:,ind2])
+                rec['I1_dprime'] [ii,:] = get_img_dprime_from_imgdata(imgdata, ii)
             if ('I2_dprime' in compute_metrics):
                 for jj in range(nobjs):
-                    if imgdata['true'][ii,jj] > 0:
-                        rec['I2_dprime'][ii,jj] = np.nan
+                    obj_i = np.nonzero(imgdata['true'][ii,:] > 0)[0]#what obj is this img
+                    if (len(obj_i) == 0):# | (obj_i[0] == jj):
                         continue
-                    rec['I2_dprime'][ii,jj] = obj.dprime_from2x2(hitmat_curr[:,[t,jj]])
+                    elif obj_i[0] == jj:
+			continue
+		    else:
+                        obj_i = obj_i[0]
+                    rec['I2_dprime'][ii,jj] = get_img_dprime_from_imgdata(imgdata_pertask[obj_i][jj], ii)
 
     if O2_normalize:
         for fn in rec.keys():
