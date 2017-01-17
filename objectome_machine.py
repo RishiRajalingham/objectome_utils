@@ -271,6 +271,7 @@ def testFeatures(all_features, all_metas, features_oi, objects_oi):
     for feat in features_oi:
         if feat not in all_features.keys():
             continue
+        task_trials_feat = ()
         features = all_features[feat]
         meta = fix_meta(all_metas[feat])
         tasks = getBinaryTasks(meta, tasks_oi)
@@ -279,10 +280,12 @@ def testFeatures(all_features, all_metas, features_oi, objects_oi):
             features_sample = sampleFeatures(features, noise_model, subsample)
             for task in tasks:
                 trials = testFeatures_base(features_sample, meta, task, objs_oi, nsplits=nsplits)
-                task_trials = task_trials + (trials,)
+                task_trials_feat = task_trials_feat + (trials,)
         task_trials = tb.rowstack(task_trials)
+
         task_trials['WorkerID'] = feat
-        rec[feat] = task_trials
+        task_trials_feat = tb.rowstack(task_trials_feat)
+        rec[feat] = task_trials_feat
     return task_trials
 
 """ ********** Main functions ********** """

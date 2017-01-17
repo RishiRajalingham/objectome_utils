@@ -15,6 +15,8 @@ use_microsaccades = False
 STIMPATH_HVM = '/mindhive/dicarlolab/u/rishir/stimuli/hvm/'
 STIMPATH_HVMRET = '/mindhive/dicarlolab/u/rishir/stimuli/hvmret/'
 STIMPATH_OBJ = '/mindhive/dicarlolab/u/rishir/stimuli/objectome64s100/'
+
+STIMPATH_OBJ_ALPHA = '/mindhive/dicarlolab/u/rishir/stimuli/objectome64alpha_6/'
 STIMPATH_OBJNOBG = '/mindhive/dicarlolab/u/rishir/stimuli/objectome64s100nobg/'
 STIMPATH_OBJRET = '/mindhive/dicarlolab/u/rishir/stimuli/objectome64s100ret/'
 STIMPATH_ALPHALOWVAR = '/mindhive/dicarlolab/u/rishir/stimuli/alphabet_textured/'
@@ -30,7 +32,7 @@ MAXNSTIM = 1000000000
 layers_oi = {
     'VGG_S':            {'fc6', 'fc7', 'fc8'}, 
     'caffe_reference':  {'fc6', 'fc7', 'fc8'}, 
-    'AlexNet': {'conv5'}, # {'fc6', 'fc7', 'fc8'}, 
+    'AlexNet': {'fc6', 'fc7', 'fc8'}, 
     'GoogLeNet':        {'pool5/7x7_s1'},
     'ResNet': {'fc1000'}
 }
@@ -152,7 +154,7 @@ def run_model(stimpath, cnn_oi='VGG_S'):
 
     compute_layers = layers_oi[cnn_oi]
     layer_dim = {'conv5': 43264,'fc6':4096, 'fc7':4096, 'fc8':1000, 'pool5/7x7_s1':1024, 'fc1000':1000}
-    
+
     features_perlayer = {}
     for layer in compute_layers:
         dim = layer_dim[layer]
@@ -170,7 +172,8 @@ def run_model(stimpath, cnn_oi='VGG_S'):
         out = net.forward()
         for layer in compute_layers:
             outdata = net.blobs[layer].data
-	    tmpdata = np.reshape(outdata, (BATCHSIZE, dim))
+            dim = layer_dim[layer]
+            tmpdata = np.reshape(outdata, (BATCHSIZE, dim))
             features_perlayer[layer][indices[i]:indices[i+1], :] = tmpdata
         
     return features_perlayer, meta, output_path
@@ -214,10 +217,7 @@ def run_one(stimpath, cnn_oi):
     features_perlayer, meta, output_path = run_model(stimpath=stimpath, cnn_oi=cnn_oi)
     save_features(features_perlayer, meta, cnn_oi, output_path, repindex=None)
 
-# run_one(stimpath=STIMPATH_ONLYRXY, cnn_oi='GoogLeNet')
-# run_one(stimpath=STIMPATH_ONLYRXZ, cnn_oi='GoogLeNet')
-# run_one(stimpath=STIMPATH_ONLYRYZ, cnn_oi='GoogLeNet')
 
-run_one(stimpath=STIMPATH_HVM, cnn_oi='AlexNet')
-# run_one(stimpath=STIMPATH_HVM, cnn_oi='VGG_S')
-# run_one(stimpath=STIMPATH_HVM, cnn_oi='GoogLeNet')
+run_one(stimpath=STIMPATH_OBJ_ALPHA, cnn_oi='AlexNet')
+run_one(stimpath=STIMPATH_OBJ_ALPHA, cnn_oi='GoogLeNet')
+run_one(stimpath=STIMPATH_OBJ_ALPHA, cnn_oi='ResNet')

@@ -52,7 +52,10 @@ class psychophysDatasetObject(object):
         else:
             self.collection = collection
             self.load_from_disk()
-            print 'Loaded from local mongo backup...'    
+            print 'Loaded from local mongo backup...'  
+
+        nsubs = len(np.unique(self.trials['WorkerID']))
+        print '%d trials from %d subjects' % (self.trials.shape[0], nsubs)
     
     def backup_to_disk(self):
         dat = {
@@ -300,6 +303,7 @@ def compute_behavioral_metrics(trials, meta, compute_metrics={'I1_dprime'}, O2_n
 
 def compute_behavioral_metrics_base(trials, meta, compute_metrics={'I1_dprime'}, O2_normalize=True, rec_precomputed=None):
     uobjs = list(set(trials['sample_obj']))
+    uobjs = list(set(meta['obj']))
     uimgs = [m['id'] for m in meta if m['obj'] in uobjs]
 
     nimgs = len(uimgs)
@@ -371,4 +375,51 @@ def compute_behavioral_metrics_base(trials, meta, compute_metrics={'I1_dprime'},
     return rec, imgdata
 
 
+def recompute_behavioral_metrics_base(imgdata, rec={}, compute_metrics={'I1_dprime'}):
+    nimgs, nobjs = imgdata['choice'].shape
+
+    if ('I1_hitrate' in compute_metrics) | ('I2_hitrate' in compute_metrics):
+        hitrates_ = imgdata['choice'] / (1.0*imgdata['selection'])
+        rec['I2_hitrate'] = hitrates_
+        hitrates_[imgdata['true'] > 0] = np.nan
+        rec['I1_hitrate'] = 1.0 - np.nanmean(hitrates_,1)
+        
+    if ('I1_dprime' in compute_metrics) | ('I2_dprime' in compute_metrics):
+        rec['I1_dprime'] = np.zeros((nimgs,1))
+        rec['I2_dprime'] = np.zeros((nimgs,nobjs))
+        for ii in range(nimgs):
+            if ('I1_dprime' in compute_metrics):
+                rec['I1_dprime'] [ii,:] = get_img_dprime_from_imgdata(imgdata, ii)
+            if ('I2_dprime' in compute_metrics):
+                for jj in range(nobjs):
+                    obj_i = np.nonzero(imgdata['true'][ii,:] > 0)[0]#what obj is this img
+                    if (len(obj_i) == 0):# | (obj_i[0] == jj):
+                        continue
+                    elif obj_i[0] == jj:
+                        continue
+                    else:
+                        obj_i = obj_i[0]
+                        rec['I2_dprime'][ii,jj] = get_img_dprime_from_imgdata(imgdata_pertask[obj_i][jj], ii)
+    return rec
+
+
+def recompute_behavioral_metrics():
+    import glob
+
+    fns = glob.glob('/mindhive/dicarlolab/u/rishir/monkey_objectome/behavioral_benchmark/data/splithalf_imgdata/*.pkl')
+    for fn in fns:
+        fn2 = fn.replace('splithalf_imgdata/', 'metrics/')
+        imgdata = pk.load(open(fn, 'r'))
+        rec = pk.load(open(fn2, 'r'))
+        for i in range(len(imgdata)):
+            for j in range(2):
+                rec_new = recompute_behavioral_metrics_base(imgdata[i][j], rec={}, compute_metrics={'I1_dprime'})
+                for rfn in rec_new.keys():
+                    rec[rfn][i][j] = rec_new[rfn]
+
+        with open(fn2, 'wb') as _f:
+            pk.dump(rec, _f)
+        print 'saved ' + fn2
+
+        
 
