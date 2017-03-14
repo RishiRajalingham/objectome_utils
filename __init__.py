@@ -1,5 +1,7 @@
 from .base import *
+from .utils import *
 from .objectome_features import *
 from .objectome_machine import *
 from .objectome_behavior import *
+from .objectome_metrics import *
 from .hvm_alike import *

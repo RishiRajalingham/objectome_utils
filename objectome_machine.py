@@ -28,7 +28,9 @@ METRIC_KWARGS = {
         'model_kwargs': {'fnorm': True, 'snorm': False}},
     'rbfsvm': {'model_type': 'libSVM', 
         'model_kwargs': {'C': 50000, 'class_weight': 'auto',
-        'kernel': 'rbf'}}
+        'kernel': 'rbf'}},
+    'knn': {'model_type': 'neighbors.KNeighborsClassifier', 
+        'model_kwargs': {'n_neighbors':5}}
 }
 
 """ ********** Binary task formatting ********** """
@@ -39,7 +41,7 @@ def getBinaryTasks_pair(meta, object_pairs_oi):
     for p in range(nc_objs):
         o1 = object_pairs_oi[p][0]
         o2 = object_pairs_oi[p][1]
-        trial_ind = np.nonzero((meta['obj'] == o1) | (meta['obj'] == o2))
+        trial_ind = np.nonzero((meta['obj'] == o1) | (meta['obj'] == o2))[0]
         random.shuffle(trial_ind)
         tasks.append(np.array(trial_ind))
     return tasks
@@ -53,7 +55,7 @@ def getBinaryTasks_all(meta, objects_oi=None):
     pairings = list(itertools.combinations(range(nc_objs), 2))
     tasks = []
     for p in pairings:
-        trial_ind = np.nonzero((meta['obj'] == objects_oi[p[0]]) | (meta['obj'] == objects_oi[p[1]]))
+        trial_ind = np.nonzero((meta['obj'] == objects_oi[p[0]]) | (meta['obj'] == objects_oi[p[1]]))[0]
         random.shuffle(trial_ind)
         tasks.append(np.array(trial_ind))
     return tasks
@@ -89,6 +91,8 @@ def sampleFeatures(features, noise_model=None, subsample=None):
 """ ********** Classifier functions ********** """
 
 def getClassifierRecord(features_task, meta_task, n_splits=100, classifiertype='svm'):
+    balanced_train_test = True # 2 fold cv or 10?
+
     if len(meta_task) == 1:
         meta_task = meta_task[0]
     features_task = np.squeeze(features_task)
@@ -97,8 +101,13 @@ def getClassifierRecord(features_task, meta_task, n_splits=100, classifiertype='
     train_q, test_q = {}, {}
     npc_all = [np.sum(list(meta_task['obj'] == o)) for o in uobj]
     npc = min(npc_all)
-    npc_train = npc/2
-    npc_test = npc/2
+    if balanced_train_test:
+        npc_train = npc/2
+        npc_test = npc/2
+    else:
+        npc_train = int(npc * 0.9)
+        npc_test = npc - npc_train
+
     metric_kwargs = METRIC_KWARGS[classifiertype]
     
     
@@ -151,7 +160,8 @@ def getBehavioralPatternFromRecord(rec, meta, obj_idx=None):
         split_ind = rec['splits'][0][s_ind]['test']
         pred_label = np.array(rec['split_results'][s_ind]['test_prediction'])
         true_label = meta[split_ind]['obj']
-        distr_label = [np.setdiff1d(labelset,pl)[0] for pl in meta[split_ind]['obj']]
+        distr_label = [np.setdiff1d(labelset,np.array(pl))[0] for pl in meta[split_ind]['obj']]
+        assert sum(true_label == distr_label) == 0
         imgid = meta[split_ind]['id']
 
         for i in range(len(imgid)):
@@ -163,8 +173,8 @@ def getBehavioralPatternFromRecord(rec, meta, obj_idx=None):
 
     return tb.tabarray(records=trial_records, names=KW_NAMES, formats=KW_FORMATS)
 
-
-def testFeatures_base(features, meta, task, objects_oi=None, features_s=None, nsplits=100):
+def testFeatures_base(features, meta, task, 
+    objects_oi=None, n_splits=100, classifiertype='svm'):
     features_task = np.squeeze(features[task,:])
     meta_task = meta[task]
     if len(meta_task) == 1:
@@ -174,84 +184,12 @@ def testFeatures_base(features, meta, task, objects_oi=None, features_s=None, ns
     for i,m in enumerate(objects_oi):
         obj_idx[m] = i
     
-    rec = getClassifierRecord(features_task, meta_task, nsplits)
+    rec = getClassifierRecord(features_task, meta_task, n_splits=n_splits, classifiertype='svm')
     return getBehavioralPatternFromRecord(rec, meta_task, obj_idx)
 
-   
-        
-
-# def getBehavioralPatternFromRecord(rec, meta, obj_idx=None):
-#     nsplits = len(rec['splits'][0])
-#     trials_dict =  {'sample_obj':[], 'dist_obj':[], 'choice':[], 'id':[]}
-#     trials, performance = [],[]
-
-#     for s_ind, split in enumerate(rec['splits']):
-#         labelset = rec['split_results'][s_ind]['labelset']
-#         split_ind = rec['splits'][0][s_ind]['test']
-#         pred_label = np.array(rec['split_results'][s_ind]['test_prediction'])
-#         true_label = meta[split_ind]['obj']
-#         distr_label = [np.setdiff1d(labelset,pl)[0] for pl in meta[split_ind]['obj']]
-#         imgid = meta[split_ind]['id']
-
-#         perf = (pred_label == true_label).sum() / (len(pred_label)*1.0)
-#         performance.extend([perf])
-        
-#         trials_dict['choice'].extend(pred_label)
-#         trials_dict['sample_obj'].extend(true_label)
-#         trials_dict['dist_obj'].extend(distr_label)
-#         trials_dict['id'].extend(imgid)
-
-#         if obj_idx != None:
-#             pred_labels_i = np.array([obj_idx[pl] for pl in pred_label])
-#             actual_labels_i = np.array([obj_idx[pl] for pl in true_label])
-#             distr_labels_i = np.array([obj_idx[pl] for pl in distr_label])
-#             imgid_i = np.array([obj.get_index_MWorksRelative(pl) for pl in imgid])
-#             trials.extend(np.array([actual_labels_i, actual_labels_i, distr_labels_i, pred_labels_i, imgid_i]).T)
-#     performance = np.array(performance).mean(0)
-#     trials = np.array(trials)
-#     return performance, trials_dict, trials
-
-# def testFeatures_base(features, meta, task, objects_oi=None, features_s=None, nsplits=2):
-#     features_task = np.squeeze(features[task,:])
-#     meta_task = meta[task]
-#     if len(meta_task) == 1:
-#         meta_task = meta_task[0] # weird bug??
-
-#     obj_idx = {}
-#     for i,m in enumerate(objects_oi):
-#         obj_idx[m] = i
-    
-#     rec = getClassifierRecord(features_task, meta_task, nsplits)
-#     trials = getBehavioralPatternFromRecord(rec, meta_task, obj_idx)
-
-#     # return trials_dict
-    
-#     trials_s, performance_s = {}, {}
-#     if features_s != None:
-#         for fs in features_s:
-#             if not (fs in performance_s):
-#                 performance_s[fs], trials_s[fs] = [],[]
-#             features_s_ = np.squeeze(features_s[fs]['features'][task,:])
-#             rec_s = runClassifierRecord(features, meta, rec)
-#             perf_ts_, trials_s_dict, trial_s_ = getBehavioralPatternFromRecord(rec_s, meta, obj_idx)
-#             performance_s[fs].extend([perf_tmp])
-#             trials_s[fs].extend(trial_s_)
-
-#     performance = np.array(performance)
-#     trials = format_trials_var(trials)
-#     if features_s != None:
-#         trials_s = format_trials_var(trials_s)
-
-#     rec = {
-#         'performance':performance,
-#         'performance_s':performance_s,
-#         'trials_dict':trials_dict,
-#         'trials':trials,
-#         'trials_s':trials_s
-#     }
-#     return rec
-        
-def testFeatures(all_features, all_metas, features_oi, objects_oi):
+def testFeatures(all_features, all_metas, features_oi, objects_oi,
+        n_splits=100, classifiertype='svm'):
+    """ update this so that it only runs on one feature at a time """
     if type(objects_oi) is dict:
         objs_oi = objects_oi['objs']
         tasks_oi = objects_oi['tasks']
@@ -279,13 +217,19 @@ def testFeatures(all_features, all_metas, features_oi, objects_oi):
         for isample in range(nsamples_noisemodel):
             features_sample = sampleFeatures(features, noise_model, subsample)
             for task in tasks:
-                trials = testFeatures_base(features_sample, meta, task, objs_oi, nsplits=nsplits)
+                trials = testFeatures_base(features_sample, meta, task, 
+                    objects_oi=objs_oi, n_splits=n_splits, classifiertype=classifiertype)
                 task_trials_feat = task_trials_feat + (trials,)
-        task_trials = tb.rowstack(task_trials)
-
-        task_trials['WorkerID'] = feat
+        
         task_trials_feat = tb.rowstack(task_trials_feat)
+        task_trials_feat['WorkerID'] = feat
+        task_trials_feat['AssignmentID'] = 'knn50'
+
+        task_trials = task_trials + (task_trials_feat,)
+        
         rec[feat] = task_trials_feat
+    task_trials = tb.rowstack(task_trials)
+
     return task_trials
 
 """ ********** Main functions ********** """
@@ -308,46 +252,6 @@ def computePairWiseConfusions(objects_oi, OUTPATH=None, IMGPATH=None):
     return 
 
 
-""" New stuff? """
-# def getBehavioralMetrics_base(features, meta, tasks):
-#     trials =  {'sample_obj':[], 'dist_obj':[], 'choice':[], 'id':[]}
-#     for task in tasks:
-#         features_task = np.squeeze(features[task,:])
-#         meta_task = meta[task][0]
-#         rec_ = getClassifierRecord(features_task, meta_task)
-#         beh_ = getBehavioralPatternFromRecord(rec_, meta_task)
-#         [trials[fn].extend(beh_[fn]) for fn in trials]
-
-#     trials_keys = trials.keys()
-#     for fk in trials_keys:
-#         trials[fk] = np.array(trials[fk])
-
-#     return obj.compute_behavioral_metrics(trials, meta)
-
-# def getBehavioralMetrics(features, meta, tasks):
-#     s = features.shape
-#     nim, nrep, nfeat = s[0],s[1],s[2]
-#     rec = {'I1':[[],[]]}
-#     niter = 10
-
-#     for itr in range(niter):
-#         trials =  {'sample_obj':[], 'dist_obj':[], 'choice':[], 'id':[]}
-
-#         nrep_split = int(nrep/2)
-#         feature_splits = {
-#             'split1':np.zeros((nim, nrep_split, nfeat)),
-#             'split2':np.zeros((nim, nrep_split, nfeat))}
-#         for im in range(nim):
-#             tmp = range(nrep)
-#             np.random.shuffle(tmp)
-#             feature_splits['split1'][im,:,:] = features[im,tmp[:nrep_split],:]
-#             feature_splits['split2'][im,:,:] = features[im,tmp[-nrep_split:],:]
-        
-        
-#         rec['I1'][0].append( getBehavioralMetrics_base(feature_splits['split1'].mean(1), meta, tasks)['I1'])
-#         rec['I1'][1].append( getBehavioralMetrics_base(feature_splits['split2'].mean(1), meta, tasks)['I1'])
-
-#     return rec
 
 def run_machine_features():
     outpath = '/mindhive/dicarlolab/u/rishir/models/hvm10/' 
@@ -384,67 +288,6 @@ def getSplitHalfPerformance(rec, meta):
 
     return perf1, perf2
 
-# def getSilencedPerformance(features_s, meta, rec, obj_idx=None):
-#     nsplits = len(rec['splits'][0])
-#     all_labels = np.array([obj_idx[l] for l in np.unique(meta['obj'])])
-#     labelset = rec['result_summary']['labelset']
-#     performance, trials = [], []
-    
-#     for i in range(nsplits):
-#         split_ind = rec['splits'][0][i]['test']
-#         model = rec['split_results'][i]['model']
-
-#         pred_label_tmp = model.predict(features_s[split_ind,:])
-#         pred_labels = np.array([labelset[pli] for pli in pred_label_tmp])
-#         actual_labels = meta[split_ind]['obj']
-#         hr = (pred_labels == actual_labels).sum()
-#         perf = hr / (len(pred_labels)*1.0)
-#         performance.extend([perf])
-
-#         if obj_idx != None:
-#             pred_labels_i = np.array([obj_idx[pl] for pl in pred_labels])
-#             actual_labels_i = np.array([obj_idx[pl] for pl in actual_labels])
-#             nonmatch_labels_i = np.array([np.setdiff1d(all_labels, pl)[0] for pl in actual_labels_i])
-#             tmp = np.array([actual_labels_i, actual_labels_i, nonmatch_labels_i, pred_labels_i]).T
-#             trials.extend(tmp)
-
-#     performance = np.array(performance).mean(0)
-
-#     return performance, trials
-    
-# def getTrialsFromRecord(rec, meta, obj_idx):
-#     nsplits = len(rec['splits'][0])
-#     all_labels = np.array([obj_idx[l] for l in np.unique(meta['obj'])])
-#     labelset = rec['result_summary']['labelset']
-#     trials_io, trials = [], []
-#     for i in range(nsplits):
-#         """ training error for ideal observer """
-#         split_ind = rec['splits'][0][i]['train']
-#         pred_labels = np.array(rec['split_results'][i]['train_prediction'])
-#         actual_labels = meta[split_ind]['obj']
-#         image_fns = meta[split_ind]['id']
-
-#         pred_labels_i = np.array([obj_idx[pl] for pl in pred_labels])
-#         actual_labels_i = np.array([obj_idx[pl] for pl in actual_labels])
-#         nonmatch_labels_i = np.array([np.setdiff1d(all_labels, pl)[0] for pl in actual_labels_i])
-#         image_inds = np.array([get_index_MWorksRelative(img_i) for img_i in image_fns])
-#         tmp = np.array([actual_labels_i, actual_labels_i, nonmatch_labels_i, pred_labels_i, image_inds]).T
-#         trials_io.extend(tmp)
-        
-#         """ testing error  """
-#         split_ind = rec['splits'][0][i]['test']
-#         pred_labels = np.array(rec['split_results'][i]['test_prediction'])
-#         actual_labels = meta[split_ind]['obj']
-#         image_fns = meta[split_ind]['id']
-
-#         pred_labels_i = np.array([obj_idx[pl] for pl in pred_labels])
-#         actual_labels_i = np.array([obj_idx[pl] for pl in actual_labels])
-#         nonmatch_labels_i = np.array([np.setdiff1d(all_labels, pl)[0] for pl in actual_labels_i])
-#         image_inds = np.array([get_index_MWorksRelative(img_i) for img_i in image_fns])
-#         tmp = np.array([actual_labels_i, actual_labels_i, nonmatch_labels_i, pred_labels_i, image_inds]).T
-#         trials.extend(tmp)
-
-#     return trials, trials_io
 
 def format_trials_var(trials):
     if (trials == None) | (trials == []):
@@ -461,41 +304,7 @@ def format_trials_var(trials):
         trials = np.array(trials).astype('double')
         return trials
 
-# def getPerformanceFromFeatures_base(features, meta, task, objects_oi=None, features_s=None, nsplits=2):
 
-#     features_task = np.squeeze(features[task,:])
-    
-#     meta_task = meta[task]
-#     if len(meta_task) == 1:
-#         meta_task = meta_task[0] # weird bug??
-
-#     obj_idx = {}
-#     for i,m in enumerate(objects_oi):
-#         obj_idx[m] = i
-    
-#     rec = getClassifierRecord(features_task, meta_task, nsplits)
-#     trials, trials_io = getTrialsFromRecord(rec, meta_task, obj_idx)
-#     performance = 1-rec['accbal_loss']
-    
-#     trials_s, performance_s = {}, {}
-#     if features_s != None:
-#         for fs in features_s:
-#             if not (fs in performance_s):
-#                 performance_s[fs], trials_s[fs] = [],[]
-#             features_s_ = np.squeeze(features_s[fs]['features'][task,:])
-#             perf_tmp, trials_tmp = getSilencedPerformance(features_s_, meta_task, rec, obj_idx=None)
-#             performance_s[fs].extend([perf_tmp])
-#             trials_s[fs].extend(trials_tmp)
-
-
-#     performance = np.array(performance)
-#     trials = format_trials_var(trials)
-#     trials_io = format_trials_var(trials_io)
-#     if features_s != None:
-#         trials_s = format_trials_var(trials_s)
-
-#     return performance, performance_s, trials, trials_io, trials_s
-        
 def computePairWiseConfusions_base(objects_oi, OUTPATH=None, silence_mode=0):
     """ For a set of objects, compute pixel and v1 features, run classifiers,
         and output trial structures for all 2x2 tasks.

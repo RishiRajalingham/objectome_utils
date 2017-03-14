@@ -16,7 +16,7 @@ STIMPATH_HVM = '/mindhive/dicarlolab/u/rishir/stimuli/hvm/'
 STIMPATH_HVMRET = '/mindhive/dicarlolab/u/rishir/stimuli/hvmret/'
 STIMPATH_OBJ = '/mindhive/dicarlolab/u/rishir/stimuli/objectome64s100/'
 
-STIMPATH_OBJ_ALPHA = '/mindhive/dicarlolab/u/rishir/stimuli/objectome64alpha_6/'
+STIMPATH_OBJ_ALPHA = '/mindhive/dicarlolab/u/rishir/stimuli/objectome64alpha_2/'
 STIMPATH_OBJNOBG = '/mindhive/dicarlolab/u/rishir/stimuli/objectome64s100nobg/'
 STIMPATH_OBJRET = '/mindhive/dicarlolab/u/rishir/stimuli/objectome64s100ret/'
 STIMPATH_ALPHALOWVAR = '/mindhive/dicarlolab/u/rishir/stimuli/alphabet_textured/'
@@ -218,6 +218,8 @@ def run_one(stimpath, cnn_oi):
     save_features(features_perlayer, meta, cnn_oi, output_path, repindex=None)
 
 
-run_one(stimpath=STIMPATH_OBJ_ALPHA, cnn_oi='AlexNet')
+# run_one(stimpath=STIMPATH_OBJ_ALPHA, cnn_oi='AlexNet')
 run_one(stimpath=STIMPATH_OBJ_ALPHA, cnn_oi='GoogLeNet')
-run_one(stimpath=STIMPATH_OBJ_ALPHA, cnn_oi='ResNet')
+# run_one(stimpath=STIMPATH_OBJ_ALPHA, cnn_oi='ResNet')
+
+

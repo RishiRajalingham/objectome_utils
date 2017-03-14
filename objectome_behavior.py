@@ -236,22 +236,39 @@ def get_obj_dprime_from_trials(trials, SIGLABEL):
     C2x2[1,1] = sum((trials['sample_obj'] != SIGLABEL) & (trials['choice'] != SIGLABEL)) # correct rej
     return obj.dprime_from2x2(C2x2)
 
-def get_img_dprime_from_imgdata(imgdata, img_i):
-    nobjs = imgdata['true'].shape[1]
-    t = np.nonzero(imgdata['true'][img_i,:] > 0)[0] # what obj is img_i?
-    if len(t) == 0:
-        return np.nan
+def get_img_dprime_from_imgdata(imgdata, img_i, obj_i=None):
+    """ get dprime computed for image img_i, based on distracters obj_i.
+    can be used to compute both I1 (over any set of distracters) and I2.
+    """
+    if obj_i == None:
+        obj_i = range(imgdata['true'].shape[1])
     else:
-        t = t[0]
-    t_i = np.nonzero(imgdata['true'][:,t] == 0)[0] # all negative images
-    if len(t_i) == 0:
+        lab = np.nonzero(imgdata['true'][img_i,:] > 0)[0][0]
+        obj_i = np.unique([obj_i, lab])
+        
+    nobjs = len(obj_i)
+    if nobjs == 1:
         return np.nan
-    ind = np.concatenate(([img_i],t_i)) # order positive + negatives
-    hitmat_curr = imgdata['choice'] / (1.0*imgdata['selection'])
-    hitmat_curr = hitmat_curr[ind,:]
+
+    true_ = imgdata['true'][:,obj_i]
+    choice_ = imgdata['choice'][:,obj_i]
+    selection_ = imgdata['selection'][:,obj_i]
+
+    # what obj is img_i?
+    t = np.nonzero(true_[img_i,:] > 0)[0][0]
+    # all negative images
+    t_i = np.nonzero(true_[:,t] == 0)[0] 
+
+    # order positive + negatives images
+    ind = np.concatenate(([img_i],t_i))
+    # order positive + negative objs 
     ind2 = list(set(range(nobjs))-set([t]))
-    ind2 = np.hstack(([t], ind2)) # order positive + netatives
-    return dprime_from2x2(hitmat_curr[:,ind2])
+    ind2 = np.hstack(([t], ind2)) 
+
+    hitmat_curr = choice_ / (1.0*selection_)
+    hitmat_curr = hitmat_curr[ind,:]
+    
+    return obj.dprime_from2x2(hitmat_curr[:,ind2])
 
 
 def compute_behavioral_metrics(trials, meta, compute_metrics={'I1_dprime'}, O2_normalize=True, niter=10, rec_precomputed=None):
@@ -350,8 +367,8 @@ def compute_behavioral_metrics_base(trials, meta, compute_metrics={'I1_dprime'},
                     if (len(obj_i) == 0):# | (obj_i[0] == jj):
                         continue
                     elif obj_i[0] == jj:
-			continue
-		    else:
+                        continue
+                    else:
                         obj_i = obj_i[0]
                     rec['I2_dprime'][ii,jj] = get_img_dprime_from_imgdata(imgdata_pertask[obj_i][jj], ii)
 
