@@ -18,6 +18,10 @@ import dldata.metrics.classifier as classifier
 import objectome_utils as obj
 from objectome_utils import get_index_MWorksRelative
 
+import warnings
+with warnings.catch_warnings():
+    warnings.filterwarnings("ignore",category=DeprecationWarning)
+
 HOMEPATH = '/mindhive/dicarlolab/u/rishir/monkey_objectome/machine_behaviour/'
 
 METRIC_KWARGS = {

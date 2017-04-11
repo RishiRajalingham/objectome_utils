@@ -16,7 +16,7 @@ STIMPATH_HVM = '/mindhive/dicarlolab/u/rishir/stimuli/hvm/'
 STIMPATH_HVMRET = '/mindhive/dicarlolab/u/rishir/stimuli/hvmret/'
 STIMPATH_OBJ = '/mindhive/dicarlolab/u/rishir/stimuli/objectome64s100/'
 
-STIMPATH_OBJ_ALPHA = '/mindhive/dicarlolab/u/rishir/stimuli/objectome64alpha_2/'
+STIMPATH_OBJ_ALPHA = '/mindhive/dicarlolab/u/rishir/stimuli/objectome64alpha_5/'
 STIMPATH_OBJNOBG = '/mindhive/dicarlolab/u/rishir/stimuli/objectome64s100nobg/'
 STIMPATH_OBJRET = '/mindhive/dicarlolab/u/rishir/stimuli/objectome64s100ret/'
 STIMPATH_ALPHALOWVAR = '/mindhive/dicarlolab/u/rishir/stimuli/alphabet_textured/'
