@@ -1,14 +1,18 @@
 import numpy as np 
 import scipy as sp
+import Quaternion as Q
 
-def nanzscore(x):
-    zscore = sp.stats.mstats.zscore
-    y = np.ones(x.shape) * np.nan
-    t = np.isnan(x) == False
-    y[t] = zscore(x[t])
+def nanzscore(x, mean_only=False):
+    if mean_only:
+        y = np.ones(x.shape) * np.nan
+        t = np.isnan(x) == False
+        y[t] = x[t] - np.nanmean(x[t])
+    else:
+        zscore = sp.stats.mstats.zscore
+        y = np.ones(x.shape) * np.nan
+        t = np.isnan(x) == False
+        y[t] = zscore(x[t])
     return y
-
-
 
 def grpstats(X,G):
     mu, sig_se, sig_sd = [],[],[]
@@ -28,6 +32,36 @@ def bin_variable(factor, prctile_step=10):
     factor_b = np.squeeze([np.nonzero(np.histogram(xi, bins)[0] == 1)[0] for xi in factor])
     factor_centers = grpstats(factor, factor_b)[1]
     return factor_b, factor_centers    
+
+
+
+# Convert euler angles (in degrees, rx->ry->rz) to Quaternions
+def euler2q(rx0, ry0, rz0):
+    rx = rx0 * (np.pi / 180) / 2
+    ry = ry0 * (np.pi / 180) / 2
+    rz = rz0 * (np.pi / 180) / 2
+    cz = np.cos(rz)
+    sz = np.sin(rz)
+    cy = np.cos(ry)
+    sy = np.sin(ry)
+    cx = np.cos(rx)
+    sx = np.sin(rx)
+    x = sx*cy*cz - cx*sy*sz
+    y = cx*sy*cz + sx*cy*sz
+    z = cx*cy*sz - sx*sy*cz
+    w = cx*cy*cz + sx*sy*sz
+    return Q.Quat(Q.normalize([x, y, z, w])).q
+
+# compute quaternion difference
+def get_quat_diff(q, q0):
+    Qq = Q.Quat(q)
+    Qq0 = Q.Quat(q0)
+    Qdiff = Qq * Qq0.inv()
+    return np.acos(np.abs(Qdiff.q))
+
+
+
+
 
 def features_to_metrics(features, meta, suffix=''):
     data = np.load(featurespath + f + '.npy')

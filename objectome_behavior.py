@@ -159,13 +159,15 @@ def get_model_data(dataset='objectome24'):
 
 
 
-def composite_dataset(dataset='objectome24', threshold=12000, mongo_reload=False):
+def composite_dataset(dataset='objectome24', meta=None, threshold=12000, mongo_reload=False):
     if dataset == 'objectome24':
         collections = ['objectome64', 'objectome_imglvl', 'ko_obj24_basic_2ways', 'monkobjectome', 'ko_obj24_basic_2ways_mod_ver2']
-        meta = obj.objectome24_meta()
+        if meta == None:
+            meta = obj.objectome24_meta()
     elif dataset == 'hvm10':
         collections = ['hvm10_basic_2ways', 'hvm10_allvar_basic_2ways'] #, 'hvm10_basic_2ways_newobj', 'hvm10-finegrain']
-        meta = obj.hvm10_meta()
+        if meta == None:
+            meta = obj.hvm10_meta()
     fns = ['sample_obj', 'id', 'dist_obj', 'choice', 'WorkerID']
     col_data = ()
     for col in collections:

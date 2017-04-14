@@ -18,7 +18,9 @@ def dprime_from2x2(C):
     hr_ = C[0,0] / (1.0*np.nansum(C[0,:]))
     fp_ = np.nansum(C[1:,0]) / (1.0*np.nansum(C[1:,:]))
     dp = norm.ppf(hr_,0,1) - norm.ppf(fp_,0,1)
-    return np.clip(dp, -maxVal, maxVal)
+    dprime = np.clip(dp, -maxVal, maxVal)
+    balacc = 0.5*(hr_ + (1-fp_))
+    return dprime, balacc
 
 def get_imgdata_from_trials_base(trials, meta):
     """ trials to imgdata (per split) """
@@ -67,9 +69,8 @@ def get_img_dprime_from_imgdata(imgdata, img_i, dist_obj_i=None):
     """ get dprime computed for image img_i, based on distracters dist_obj_i.
     can be used to compute both I1 (over any set of distracters) and I2.
     """
-
     if sum(imgdata['selection'][img_i,:]) == 0:
-        return np.nan # img wasn't shown
+        return np.nan, np.nan  # img wasn't shown
     if dist_obj_i == None:
         obj_i = range(imgdata['true'].shape[1])
     else:
@@ -77,9 +78,9 @@ def get_img_dprime_from_imgdata(imgdata, img_i, dist_obj_i=None):
         obj_i = np.unique([dist_obj_i, lab])
     
     if len(obj_i) == 1:
-        return np.nan # distracter is label
+        return np.nan, np.nan  # distracter is label
     if (imgdata['selection'][img_i,dist_obj_i] == 0).all():
-        return np.nan # img wasn't shown w these distracter
+        return np.nan, np.nan  # img wasn't shown w these distracter
 
     nobjs = len(obj_i)
     true_ = imgdata['true'][:,obj_i]
@@ -99,7 +100,7 @@ def get_img_dprime_from_imgdata(imgdata, img_i, dist_obj_i=None):
 
     hitmat_curr = choice_ / (1.0*selection_)
     hitmat_curr = hitmat_curr[ind,:]
-    
+
     return dprime_from2x2(hitmat_curr[:,ind2])
 
 def get_metric_from_imgdata_base(imgdata_s, compute_metrics={'I1_dprime', 'I2_dprime'}):
@@ -108,33 +109,56 @@ def get_metric_from_imgdata_base(imgdata_s, compute_metrics={'I1_dprime', 'I2_dp
     hitrates_ = imgdata_s['choice'] / (1.0*imgdata_s['selection'])
     hitrates_[imgdata_s['true'] > 0] = np.nan
     rec = {}
-    rec['I1_hitrate'] = 1.0 - np.nanmean(hitrates_,1)
-    rec['I2_hitrate'] = deepcopy(hitrates_)
-    rec['I1_hitrate_z'] = 1.0 - np.nanmean(hitrates_,1)
-    rec['I2_hitrate_z'] = deepcopy(hitrates_)
 
-    rec['I1_dprime'] = np.ones((nimgs,1)) * np.nan
+    rec['I1_hitrate'] = 1.0 - np.nanmean(hitrates_,1)
+    rec['I1_hitrate_z'] = np.ones((nimgs,)) * np.nan
+    rec['I1_hitrate_c'] = np.ones((nimgs,)) * np.nan
+
+    rec['I2_hitrate'] = deepcopy(hitrates_)
+    rec['I2_hitrate_z'] = np.ones((nimgs,nobjs)) * np.nan
+    rec['I2_hitrate_c'] = np.ones((nimgs,nobjs)) * np.nan
+
+    rec['I1_dprime'] = np.ones((nimgs,)) * np.nan
+    rec['I1_dprime_z'] = np.ones((nimgs,)) * np.nan
+    rec['I1_dprime_c'] = np.ones((nimgs,)) * np.nan
+
     rec['I2_dprime'] = np.ones((nimgs,nobjs)) * np.nan
-    rec['I1_dprime_z'] = np.ones((nimgs,1)) * np.nan
     rec['I2_dprime_z'] = np.ones((nimgs,nobjs)) * np.nan
-    rec['I2_dprime_z2'] = np.ones((nimgs,nobjs)) * np.nan
+    rec['I2_dprime_c'] = np.ones((nimgs,nobjs)) * np.nan
+
+    rec['I1_accuracy'] = np.ones((nimgs,)) * np.nan
+    rec['I1_accuracy_z'] = np.ones((nimgs,)) * np.nan
+    rec['I1_accuracy_c'] = np.ones((nimgs,)) * np.nan
+
+    rec['I2_accuracy'] = np.ones((nimgs,nobjs)) * np.nan
+    rec['I2_accuracy_z'] = np.ones((nimgs,nobjs)) * np.nan
+    rec['I2_accuracy_c'] = np.ones((nimgs,nobjs)) * np.nan
 
     for ii in range(nimgs):
         if 'I1_dprime' in compute_metrics:
-            rec['I1_dprime'][ii] = get_img_dprime_from_imgdata(imgdata_s, ii)
+            rec['I1_dprime'][ii],rec['I1_accuracy'][ii] = get_img_dprime_from_imgdata(imgdata_s, ii)
         if 'I2_dprime' in compute_metrics:
             for jj in range(nobjs):
-                rec['I2_dprime'][ii,jj] = get_img_dprime_from_imgdata(imgdata_s, ii, jj)
-    
+                rec['I2_dprime'][ii,jj],rec['I2_accuracy'][ii,jj] = get_img_dprime_from_imgdata(imgdata_s, ii, jj)
+
     for ii in range(nobjs):
         t_i = np.nonzero(imgdata_s['true'][:,ii] > 0)[0]
         rec['I1_hitrate_z'][t_i] = nanzscore(rec['I1_hitrate'][t_i])
+        rec['I1_hitrate_c'][t_i] = nanzscore(rec['I1_hitrate'][t_i], mean_only=True)
         if 'I1_dprime' in compute_metrics:
             rec['I1_dprime_z'][t_i] = nanzscore(rec['I1_dprime'][t_i])
+            rec['I1_dprime_c'][t_i] = nanzscore(rec['I1_dprime'][t_i], mean_only=True)
+            rec['I1_accuracy_z'][t_i] = nanzscore(rec['I1_accuracy'][t_i])
+            rec['I1_accuracy_c'][t_i] = nanzscore(rec['I1_accuracy'][t_i], mean_only=True)
+
         if 'I2_dprime' in compute_metrics:
             for jj in range(nobjs):
                 rec['I2_hitrate_z'][t_i,jj] = nanzscore(rec['I2_hitrate'][t_i,jj])
+                rec['I2_hitrate_c'][t_i,jj] = nanzscore(rec['I2_hitrate'][t_i,jj], mean_only=True)
                 rec['I2_dprime_z'][t_i,jj] = nanzscore(rec['I2_dprime'][t_i,jj])
+                rec['I2_dprime_c'][t_i,jj] = nanzscore(rec['I2_dprime'][t_i,jj], mean_only=True)
+                rec['I2_accuracy_z'][t_i,jj] = nanzscore(rec['I2_accuracy'][t_i,jj])
+                rec['I2_accuracy_c'][t_i,jj] = nanzscore(rec['I2_accuracy'][t_i,jj], mean_only=True)
         
     return rec
 
