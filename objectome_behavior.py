@@ -120,7 +120,7 @@ def get_monkeyturk_data(dataset='objectome24'):
 
     col_data_seg = {}
     trial_records = []
-    subjs = ['Manto', 'Zico', 'Picasso', 'Nano', 'Magneto']
+    subjs = ['Manto', 'Zico', 'Picasso', 'Nano']
     for sub in subjs:
         x = datmat['allData'][sub][0,0]
         for xi in range(x.shape[0]):
@@ -134,10 +134,10 @@ def get_monkeyturk_data(dataset='objectome24'):
             rec_curr = (s_obj,) + (d_obj,) + (resp,) + (s_id,) + (workid,) + (assnid,) 
             trial_records.append(rec_curr)
 
-    col_data_seg['all'] = tb.tabarray(records=trial_records, names=KW_NAMES, formats=KW_FORMATS)
+    col_data_seg['pool'] = tb.tabarray(records=trial_records, names=KW_NAMES, formats=KW_FORMATS)
     for sub in subjs:
-        t = col_data_seg['all']['WorkerID'] == sub
-        col_data_seg[sub] = col_data_seg['all'][t]
+        t = col_data_seg['pool']['WorkerID'] == sub
+        col_data_seg[sub] = col_data_seg['pool'][t]
     return col_data_seg
 
 def get_model_data(dataset='objectome24'):

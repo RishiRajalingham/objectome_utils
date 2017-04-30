@@ -1,6 +1,6 @@
 import numpy as np 
 import scipy as sp
-import Quaternion as Q
+
 
 def nanzscore(x, mean_only=False):
     if mean_only:
@@ -37,6 +37,7 @@ def bin_variable(factor, prctile_step=10):
 
 # Convert euler angles (in degrees, rx->ry->rz) to Quaternions
 def euler2q(rx0, ry0, rz0):
+    import Quaternion as Q
     rx = rx0 * (np.pi / 180) / 2
     ry = ry0 * (np.pi / 180) / 2
     rz = rz0 * (np.pi / 180) / 2
@@ -54,10 +55,11 @@ def euler2q(rx0, ry0, rz0):
 
 # compute quaternion difference
 def get_quat_diff(q, q0):
+    import Quaternion as Q
     Qq = Q.Quat(q)
     Qq0 = Q.Quat(q0)
     Qdiff = Qq * Qq0.inv()
-    return np.acos(np.abs(Qdiff.q))
+    return np.arccos(np.abs(Qdiff.q))
 
 
 
