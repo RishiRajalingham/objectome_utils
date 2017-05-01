@@ -1,3 +1,10 @@
+import os
+if os.path.isdir('/mindhive/dicarlolab/u/rishir/'):
+    dicarlolab_homepath = '/mindhive/dicarlolab/u/rishir/'
+elif os.path.isdir('/mindhive/dicarlo/u/rishir/'):
+    dicarlolab_homepath = '/mindhive/dicarlo/u/rishir/'
+elif os.path.isdir('/Volumes/dicarlo/u/rishir/'):
+    dicarlolab_homepath = '/Volumes/dicarlo/u/rishir/'
 
 """ Lists of subsets of objectome objects used for various experiments. """
 
@@ -89,8 +96,9 @@ SYMBOLS_numbersarab = ['zero', 'one', 'two', 'three', 'four','five', 'six', 'sev
 SYMBOLS_all = SYMBOLS_alpharoman + SYMBOLS_alphaarab + SYMBOLS_numbersarab
 
 """ Load metadata for different imagesets """
+stim_path = dicarlolab_homepath + 'stimuli/'
 def hvm_meta():
-    return pk.load(open('/mindhive/dicarlolab/u/rishir/stimuli/hvm/metadata.pkl', 'r'))
+    return pk.load(open(stim_path + 'hvm/metadata.pkl', 'r'))
 
 def hvm10_meta():
     meta = hvm_meta()
@@ -101,17 +109,17 @@ def hvm10_meta():
     return meta_2
 
 def hvm_stimpath():
-    return '/mindhive/dicarlolab/u/rishir/stimuli/hvm/'
+    return stim_path + '/hvm/'
     
 def objectome64_meta():
-    return pk.load(open('/mindhive/dicarlolab/u/rishir/stimuli/objectome64s100/metadata.pkl', 'r'))
+    return pk.load(open(stim_path + 'objectome64s100/metadata.pkl', 'r'))
 
 def objectome24_meta():
-    return pk.load(open('/mindhive/dicarlolab/u/rishir/stimuli/objectome24s100/metadata.pkl', 'r'))
+    return pk.load(open(stim_path + 'objectome24s100/metadata.pkl', 'r'))
 
 
 def objectome_stimpath():
-    return '/mindhive/dicarlolab/u/rishir/stimuli/objectome64s100/'
+    return stim_path + 'objectome64s100/'
 
 
 """ Utilities relating to objectome objects"""
@@ -183,11 +191,10 @@ def get_canonical_angle(objn):
 import cPickle as pk
 import numpy as np
 
-MWKIMGINDEX_PATH = '/mindhive/dicarlolab/u/rishir/Manto/Images/obj24s100/'
+MWKIMGINDEX_PATH = dicarlolab_homepath + 'Manto/Images/obj24s100/'
 obj24images = list(pk.load(open(MWKIMGINDEX_PATH + 'images24.pkl' ,'r')))
 
-
-MWKIMGINDEX_PATH_HVM = '/mindhive/dicarlolab/u/rishir/stimuli_mwk/hvm10_test/'
+MWKIMGINDEX_PATH_HVM = dicarlolab_homepath + 'stimuli_mwk/hvm10_test/'
 hvm10images = pk.load(open(MWKIMGINDEX_PATH_HVM + 'images_dict.pkl' ,'r'))
 
 def get_obj_indices(models):

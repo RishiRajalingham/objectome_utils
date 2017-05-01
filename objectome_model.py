@@ -54,10 +54,10 @@ def features2trials_pertask(features_task, meta_task, opt):
          }
     rec = utils.compute_metric_base(features_task, meta_task, evalc, attach_models=False, return_splits=True)
     trial_records = []
-    for s_ind, split in enumerate(rec['splits']):
-        labelset = rec['split_results'][s_ind]['labelset']
-        split_ind = rec['splits'][0][s_ind]['test']
-        pred_label = np.array(rec['split_results'][s_ind]['test_prediction'])
+    for s_i, s_res in enumerate(rec['split_results']):
+        labelset = s_res['labelset']
+        pred_label = np.array(s_res['test_prediction'])
+        split_ind = rec['splits'][0][s_i]['test']
         true_label = meta_task[split_ind]['obj']
         distr_label = [np.setdiff1d(labelset,np.array(pl))[0] for pl in meta_task[split_ind]['obj']]
         assert sum(true_label == distr_label) == 0
@@ -70,7 +70,7 @@ def features2trials_pertask(features_task, meta_task, opt):
     KW_FORMATS = ['|S40','|S40','|S40','|S40','|S40','|S40']
     return tb.tabarray(records=trial_records, names=KW_NAMES, formats=KW_FORMATS)
 
-def features2trials(features, meta, opt=OPT_DEFAULT):
+def features2trials(features, meta, opt=OPT_DEFAULT, outfn=None):
     tasks = obj.getBinaryTasks(meta, np.array(opt['objects_oi']))
     all_trials = ()
     for isample in range(opt['nsamples_noisemodel']):
@@ -79,7 +79,15 @@ def features2trials(features, meta, opt=OPT_DEFAULT):
             task_ind = np.squeeze(task)
             trials = features2trials_pertask(features_sample[task_ind,:], meta[task_ind], opt)
             all_trials = all_trials + (trials,)
-    return tb.rowstack(all_trials)
+    trials = tb.rowstack(all_trials)
+    
+    if outfn != None:
+        spec_suffix = '%s.f%d.t%d' % (opt['classifiertype'],opt['subsample'],opt['npc_train'])
+        model_spec = opt_curr['model_spec'] + spec_suffix
+        outfn = outfn + model_spec + '.pkl'
+        pk.dump(trials, open(outfn, 'wb'))
+        print 'Saved ' + outfn + ' \n ' + str(trials.shape[0])
+    return trials
 
 
 def features2trials_spec(features, meta, opt, trial_outpath):
@@ -99,6 +107,33 @@ def features2trials_spec(features, meta, opt, trial_outpath):
                 outfn = trial_outpath + model_spec + '.pkl'
                 pk.dump(trials, open(outfn, 'wb'))
     return 
+
+def run_important_ones():
+    datapath = obj.dicarlolab_homepath + 'monkey_objectome/behavioral_benchmark/data/'
+    feature_path = obj.dicarlolab_homepath + 'stimuli/objectome24s100/features/'
+    trial_path = datapath + 'trials/'
+    models  = ['ALEXNET_fc6', 'ALEXNET_fc7','ALEXNET_fc8','VGG_fc6','VGG_fc7','VGG_fc8','RESNET101_conv5',
+        'GOOGLENET_pool5','GOOGLENETv3_pool5']
+
+    meta = obj.objectome24_meta()
+    uobj = list(set(meta['obj']))
+
+    img_sample_fn = datapath + 'specs/random_subsample_img_index.pkl'
+    imgids = pk.load(open(img_sample_fn, 'r'))
+    meta_id_list = list(meta['id'])
+    im240 = [meta_id_list.index(ii) for ii in imgids]
+
+    opt = copy.deepcopy(OPT_DEFAULT)
+    opt['train_q'] = lambda x: (x['id'] not in set(imgids))
+    opt['test_q'] = lambda x: (x['id'] in set(imgids))
+
+    for mod in models:
+        feature_fn = feature_path + mod + '.npy'
+        features = np.load(feature_fn)
+        opt['model_spec'] = mod
+        outpath = trial_path + 'im240/'
+        trials = features2trials(features, meta, opt=opt, outfn=outpath)
+    return
 
 
 

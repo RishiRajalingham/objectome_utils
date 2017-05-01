@@ -21,7 +21,7 @@ from objectome_utils import get_index_MWorksRelative
 import warnings
 warnings.filterwarnings("ignore",category=DeprecationWarning)
 
-HOMEPATH = '/mindhive/dicarlolab/u/rishir/monkey_objectome/machine_behaviour/'
+HOMEPATH = obj.dicarlolab_homepath + 'monkey_objectome/machine_behaviour/'
 
 METRIC_KWARGS = {
     'svm': {'model_type': 'libSVM', 
@@ -257,7 +257,7 @@ def computePairWiseConfusions(objects_oi, OUTPATH=None, IMGPATH=None):
 
 
 def run_machine_features():
-    outpath = '/mindhive/dicarlolab/u/rishir/models/hvm10/' 
+    outpath = obj.dicarlolab_homepath + 'models/hvm10/' 
     meta = obj.hvm_meta()
     models_oi = np.array(obj.HVM_10)
     tasks = obj.getBinaryTasks(meta, models_oi)
@@ -442,7 +442,7 @@ def save_trials(trials, objs, outfn):
 
 
 def quick_look(trials_s):
-    import matplotlib.pyplot as plt
+    # import matplotlib.pyplot as plt
     HITRATE = []
     SILFRAC = []
     for fn in trials_s:
@@ -453,9 +453,9 @@ def quick_look(trials_s):
     HITRATE = np.array(HITRATE)
     SILFRAC = np.array(SILFRAC)
 
-    plt.figure()
-    plt.scatter(SILFRAC, HITRATE)
-    plt.savefig('causality/fig/quicklook.png')
+    # plt.figure()
+    # plt.scatter(SILFRAC, HITRATE)
+    # plt.savefig('causality/fig/quicklook.png')
     return
 
 
@@ -506,7 +506,7 @@ def run_textureless():
 
 def run_letters():
     models_oi = obj.SYMBOLS_all
-    IMGPATH = '/mindhive/dicarlolab/u/rishir/stimuli/alphabet_highvar_textured/'
+    IMGPATH = obj.dicarlolab_homepath + 'stimuli/alphabet_highvar_textured/'
     OUTPATH = HOMEPATH  + 'symbols_highvar_all/output/' 
     res = computePairWiseConfusions(models_oi, OUTPATH, IMGPATH)
     return

@@ -255,14 +255,14 @@ def get_metric_from_trials_base(trials, meta):
         sam_i = (trials['sample_obj'] == OI)
         dist_i = (trials['dist_obj'] == OI)
         choice_i = (trials['choice'] == OI)
-        imd_ind_i = uimgs.index(meta[meta['obj'] == OI]['id'])
-
+        img_ind_i = np.array([uimgs.index(m['id']) for m in meta if (m['obj'] == OI) ])
+        
         for j in range(i+1, nobj):
             OJ = uobjs[j]
             sam_j = (trials['sample_obj'] == OJ)
             dist_j = (trials['dist_obj'] == OJ)
             choice_j = (trials['choice'] == OJ)
-            imd_ind_j = uimgs.index(meta[meta['obj'] == OJ]['id'])
+            img_ind_j = np.array([uimgs.index(m['id']) for m in meta if (m['obj'] == OJ) ])
             s_i = sam_i & dist_j
             s_j = sam_j & dist_i
             
@@ -277,12 +277,12 @@ def get_metric_from_trials_base(trials, meta):
             rec['O2_hitrate'][i,j] = hr
             rec['O2_hitrate'][j,i] = cr
 
-            rec['O2_dprime_exp'][imd_ind_i,:][:,j] = dp
-            rec['O2_dprime_exp'][imd_ind_j,:][:,i] = dp
-            rec['O2_hitrate_exp'][imd_ind_i,:][:,j] = hr
-            rec['O2_hitrate_exp'][imd_ind_j,:][:,i] = cr
-            rec['O2_accuracy_exp'][imd_ind_i,:][:,j] = ba
-            rec['O2_accuracy_exp'][imd_ind_j,:][:,i] = ba
+            rec['O2_dprime_exp'][img_ind_i,:][:,j] = dp
+            rec['O2_dprime_exp'][img_ind_j,:][:,i] = dp
+            rec['O2_hitrate_exp'][img_ind_i,:][:,j] = hr
+            rec['O2_hitrate_exp'][img_ind_j,:][:,i] = cr
+            rec['O2_accuracy_exp'][img_ind_i,:][:,j] = ba
+            rec['O2_accuracy_exp'][img_ind_j,:][:,i] = ba
             
         for j in range(nimgs):
             t_j = trials['id'] == uimgs[j] 

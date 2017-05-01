@@ -13,7 +13,7 @@ import tabular as tb
 import scipy.io as io
 import scipy.stats as stats
 import objectome as obj
-import fine_utils as fu
+# import fine_utils as fu
 import dldata.metrics.utils as utils
 import matplotlib.pyplot as plt
 import dldata.human_data.roschlib as rl
@@ -24,7 +24,7 @@ from sklearn.metrics import confusion_matrix
 from scipy.stats.mstats import zscore
 
 
-BKPDATAPATH = '/mindhive/dicarlolab/u/rishir/monkey_objectome/human_behaviour/data/mongodb_bkp/'
+BKPDATAPATH = obj.dicarlolab_homepath + '/monkey_objectome/human_behaviour/data/mongodb_bkp/'
 
 KW_NAMES = ['sample_obj', 'dist_obj', 'choice', 'id', 'WorkerID', 'AssignmentID']
 KW_FORMATS = ['|S40','|S40','|S40','|S40','|S40','|S40']
@@ -111,8 +111,8 @@ class psychophysDatasetObject(object):
 
 def get_monkeyturk_data(dataset='objectome24'):
     if dataset == 'objectome24':
-        meta_path = '/mindhive/dicarlolab/u/rishir/stimuli/objectome24s100/metadata.pkl'
-        data_path = '/mindhive/dicarlolab/u/rishir/monkeyturk/allData.mat'
+        meta_path = obj.dicarlolab_homepath + 'stimuli/objectome24s100/metadata.pkl'
+        data_path = obj.dicarlolab_homepath + 'monkeyturk/allData.mat'
     
     meta = pk.load(open(meta_path,'r'))
     datmat = io.loadmat(data_path)
@@ -142,7 +142,7 @@ def get_monkeyturk_data(dataset='objectome24'):
 
 def get_model_data(dataset='objectome24'):
     if dataset == 'objectome24':
-        featurespath = '/mindhive/dicarlolab/u/rishir/stimuli/objectome24s100/features/'
+        featurespath = obj.dicarlolab_homepath + 'stimuli/objectome24s100/features/'
 
     meta = obj.objectome24_meta()
     all_metas, all_features = {}, {}
