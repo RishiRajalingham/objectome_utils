@@ -3,7 +3,7 @@ import caffe
 import numpy as np
 import sys
 import os
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 import scipy.io as io
 import random
 

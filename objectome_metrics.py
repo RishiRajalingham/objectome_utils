@@ -309,8 +309,8 @@ def get_metric_from_trials_base(trials, meta):
             rec['I2_hitrate'][j,i] = hr
 
     rec['I2_dprime_c']= rec['I2_dprime'] - rec['O2_dprime_exp']
-    rec['I2_accuracy_c'][i,j] = rec['I2_accuracy'] - rec['O2_accuracy_exp']
-    rec['I2_hitrate_c'][i,j] = rec['I2_hitrate'] - rec['O2_hitrate_exp']
+    rec['I2_accuracy_c'] = rec['I2_accuracy'] - rec['O2_accuracy_exp']
+    rec['I2_hitrate_c'] = rec['I2_hitrate'] - rec['O2_hitrate_exp']
 
     rec['I1_dprime'] = np.nanmean(rec['I2_dprime'], 1)
     rec['I1_accuracy'] = np.nanmean(rec['I2_accuracy'], 1)
@@ -323,7 +323,6 @@ def get_metric_from_trials_base(trials, meta):
     return rec
 
 def get_metric_from_trials(trials, meta):
-    rec = {}
     compute_metrics = [
         'O2_dprime', 'O2_accuracy', 'O2_hitrate', 
         'I2_dprime', 'I2_accuracy', 'I2_hitrate', 
@@ -331,7 +330,7 @@ def get_metric_from_trials(trials, meta):
         'I2_dprime_c', 'I2_accuracy_c', 'I2_hitrate_c', 
         'I1_dprime_c', 'I1_accuracy_c', 'I1_hitrate_c'
         ]
-    rec = dict.fromkeys(compute_metrics)
+    rec = {k: [] for k in compute_metrics}
     for i in range(len(trials)):
         rec1 = get_metric_from_trials_base(trials[i][0], meta)
         rec2 = get_metric_from_trials_base(trials[i][1], meta)

@@ -13,9 +13,7 @@ import tabular as tb
 import scipy.io as io
 import scipy.stats as stats
 import objectome as obj
-# import fine_utils as fu
 import dldata.metrics.utils as utils
-import matplotlib.pyplot as plt
 import dldata.human_data.roschlib as rl
 
 from scipy.stats import norm

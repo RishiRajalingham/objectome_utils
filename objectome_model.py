@@ -83,7 +83,7 @@ def features2trials(features, meta, opt=OPT_DEFAULT, outfn=None):
     
     if outfn != None:
         spec_suffix = '%s.f%d.t%d' % (opt['classifiertype'],opt['subsample'],opt['npc_train'])
-        model_spec = opt_curr['model_spec'] + spec_suffix
+        model_spec = opt['model_spec'] + spec_suffix
         outfn = outfn + model_spec + '.pkl'
         pk.dump(trials, open(outfn, 'wb'))
         print 'Saved ' + outfn + ' \n ' + str(trials.shape[0])
@@ -123,16 +123,18 @@ def run_important_ones():
     meta_id_list = list(meta['id'])
     im240 = [meta_id_list.index(ii) for ii in imgids]
 
-    opt = copy.deepcopy(OPT_DEFAULT)
-    opt['train_q'] = lambda x: (x['id'] not in set(imgids))
-    opt['test_q'] = lambda x: (x['id'] in set(imgids))
+    for classifiertype in ['mcc', 'knn']:
+        opt = copy.deepcopy(OPT_DEFAULT)
+        opt['classifiertype'] = classifiertype
+        opt['train_q'] = lambda x: (x['id'] not in set(imgids))
+        opt['test_q'] = lambda x: (x['id'] in set(imgids))
 
-    for mod in models:
-        feature_fn = feature_path + mod + '.npy'
-        features = np.load(feature_fn)
-        opt['model_spec'] = mod
-        outpath = trial_path + 'im240/'
-        trials = features2trials(features, meta, opt=opt, outfn=outpath)
+        for mod in models:
+            feature_fn = feature_path + mod + '.npy'
+            features = np.load(feature_fn)
+            opt['model_spec'] = mod
+            outpath = trial_path + 'im240/'
+            trials = features2trials(features, meta, opt=opt, outfn=outpath)
     return
 
 
