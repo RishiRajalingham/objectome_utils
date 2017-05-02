@@ -24,68 +24,50 @@ def dprime_from2x2(C):
     corr_rej = 1-fp_
     return dprime, balacc, hitrate, corr_rej
 
-def get_trial_splithalves(trials,niter=10):
-    trial_splithalves = []
-    for i in range(niter):
-        ntrials = trials.shape[0]
-        tr = np.arange(ntrials)
-        random.shuffle(tr)
-        tr1 = tr[:int(len(tr)/2)]
-        tr2 = tr[int(len(tr)/2):]
-        tsh_tmp = []
-        tsh_tmp.append(trials[tr1])
-        tsh_tmp.append(trials[tr2])
-        trial_splithalves.append(tsh_tmp)
-
-    return trial_splithalves
 
 def get_metric_from_trials_base(trials, meta):
 
     uobjs = list(set(meta['obj']))
-    nobj = len(uobjs)
-    uimgs = [m['id'] for m in meta if m['obj'] in uobjs]
+    nobjs = len(uobjs)
+    uimgs = list(meta['id'])
     nimgs = len(uimgs)
 
     rec = {}
-    
-    rec['O2_dprime'] = np.ones((nobj, nobj)) * np.nan
-    rec['O2_accuracy'] = np.ones((nobj, nobj)) * np.nan
-    rec['O2_hitrate'] = np.ones((nobj, nobj)) * np.nan
-    
-    rec['O2_dprime_exp'] = np.ones((nimgs, nobj)) * np.nan
-    rec['O2_accuracy_exp'] = np.ones((nimgs, nobj)) * np.nan
-    rec['O2_hitrate_exp'] = np.ones((nimgs, nobj)) * np.nan
-    
 
-    rec['I2_dprime']  = np.ones((nimgs,nobj)) * np.nan
-    rec['I2_accuracy']  = np.ones((nimgs,nobj)) * np.nan
-    rec['I2_hitrate']  = np.ones((nimgs,nobj)) * np.nan
-    rec['I2_dprime_c']  = np.ones((nimgs,nobj)) * np.nan
-    rec['I2_accuracy_c']  = np.ones((nimgs,nobj)) * np.nan
-    rec['I2_hitrate_c']  = np.ones((nimgs,nobj)) * np.nan
+    rec['O2_dprime'] = np.ones((nobjs, nobjs)) * np.nan
+    rec['O2_accuracy'] = np.ones((nobjs, nobjs)) * np.nan
+    rec['O2_hitrate'] = np.ones((nobjs, nobjs)) * np.nan
 
-    for i in range(nobj):
+    rec['O2_dprime_exp'] = np.ones((nimgs, nobjs)) * np.nan
+    rec['O2_accuracy_exp'] = np.ones((nimgs, nobjs)) * np.nan
+    rec['O2_hitrate_exp'] = np.ones((nimgs, nobjs)) * np.nan
 
-        OI = uobjs[i]
-        sam_i = (trials['sample_obj'] == OI)
-        dist_i = (trials['dist_obj'] == OI)
-        choice_i = (trials['choice'] == OI)
-        img_ind_i = np.array([uimgs.index(m['id']) for m in meta if (m['obj'] == OI) ])
-        
-        for j in range(i+1, nobj):
-            OJ = uobjs[j]
-            sam_j = (trials['sample_obj'] == OJ)
-            dist_j = (trials['dist_obj'] == OJ)
-            choice_j = (trials['choice'] == OJ)
-            img_ind_j = np.array([uimgs.index(m['id']) for m in meta if (m['obj'] == OJ) ])
-            s_i = sam_i & dist_j
-            s_j = sam_j & dist_i
-            
+    rec['I2_dprime']  = np.ones((nimgs,nobjs)) * np.nan
+    rec['I2_accuracy']  = np.ones((nimgs,nobjs)) * np.nan
+    rec['I2_hitrate']  = np.ones((nimgs,nobjs)) * np.nan
+    rec['I2_dprime_c']  = np.ones((nimgs,nobjs)) * np.nan
+    rec['I2_accuracy_c']  = np.ones((nimgs,nobjs)) * np.nan
+    rec['I2_hitrate_c']  = np.ones((nimgs,nobjs)) * np.nan
+
+    # precompute a bunch of logicals
+    summary = [{'sam':[],'dist':[],'choice':[],'imgind':[]} for i in range(nobjs)]
+    for i,OI in enumerate(uobjs):
+        summary[i]['sam'] = (trials['sample_obj'] == OI)
+        summary[i]['dist'] = (trials['dist_obj'] == OI)
+        summary[i]['choice'] = (trials['choice'] == OI)
+        summary[i]['imgind'] = np.array([uimgs.index(m['id']) for m in meta if (m['obj'] == OI) ])
+
+    for i in range(nobjs):   
+        img_ind_i = summary[i]['imgind']
+        for j in range(i+1, nobjs):
+            img_ind_j = summary[j]['imgind']
+
             cont_table = np.zeros((2,2))
-            cont_table[0,0] = sum(s_i & choice_i)
-            cont_table[0,1] = sum(s_i & choice_j)
-            cont_table[1,0] = sum(s_j & choice_i)
-            cont_table[1,1] = sum(s_j & choice_j)
+            # read this next line as trials with: sample I, distracter J, choice I.
+            cont_table[0,0] = np.sum(summary[i]['sam'] & summary[j]['dist'] & summary[i]['choice'])
+            cont_table[0,1] = np.sum(summary[i]['sam'] & summary[j]['dist'] & summary[j]['choice'])
+            cont_table[1,0] = np.sum(summary[j]['sam'] & summary[i]['dist'] & summary[i]['choice'])
+            cont_table[1,1] = np.sum(summary[j]['sam'] & summary[i]['dist'] & summary[j]['choice'])
             dp,ba,hr,cr = dprime_from2x2(cont_table)
             rec['O2_dprime'][i,j] = dp
             rec['O2_accuracy'][i,j] = ba
@@ -102,21 +84,15 @@ def get_metric_from_trials_base(trials, meta):
         for j in range(nimgs):
             t_j = trials['id'] == uimgs[j] 
             OJ = meta[meta['id'] == uimgs[j]]['obj']
-            s_obj_j = uobjs.index(OJ)
-            if s_obj_j == i:
+            j_ = uobjs.index(OJ)
+            if j_ == i:
                 continue
-            
-            dist_j = (trials['dist_obj'] == OJ)
-            choice_j = (trials['choice'] == OJ)
-            
-            s_j = t_j & dist_i
-            s_i = sam_i & dist_j 
-            
             cont_table = np.zeros((2,2))
-            cont_table[0,0] = sum(s_j & choice_j)
-            cont_table[0,1] = sum(s_j & choice_i)
-            cont_table[1,0] = sum(s_i & choice_j)
-            cont_table[1,1] = sum(s_i & choice_i)
+            # read this next line as trials with: sample j, distracter I, choice J.
+            cont_table[0,0] = np.sum(t_j & summary[i]['dist'] & summary[j_]['choice'])
+            cont_table[0,1] = np.sum(t_j & summary[i]['dist'] & summary[i]['choice'])
+            cont_table[1,0] = np.sum(summary[i]['sam'] & summary[j_]['dist'] & summary[j_]['choice'])
+            cont_table[1,1] = np.sum(summary[i]['sam'] & summary[j_]['dist'] & summary[i]['choice'])
 
             dp,ba,hr,cr = dprime_from2x2(cont_table)
             rec['I2_dprime'][j,i] = dp
@@ -137,27 +113,28 @@ def get_metric_from_trials_base(trials, meta):
 
     return rec
 
-def get_metric_from_trials(trials, meta):
-    compute_metrics = [
+def compute_behavioral_metrics(trials, meta, niter):
+    metrics = [
         'O2_dprime', 'O2_accuracy', 'O2_hitrate', 
         'I2_dprime', 'I2_accuracy', 'I2_hitrate', 
         'I1_dprime', 'I1_accuracy', 'I1_hitrate', 
         'I2_dprime_c', 'I2_accuracy_c', 'I2_hitrate_c', 
         'I1_dprime_c', 'I1_accuracy_c', 'I1_hitrate_c'
         ]
-    rec = {k: [] for k in compute_metrics}
-    for i in range(len(trials)):
-        rec1 = get_metric_from_trials_base(trials[i][0], meta)
-        rec2 = get_metric_from_trials_base(trials[i][1], meta)
-        for fn in compute_metrics:
+    rec = {k: [] for k in metrics}
+    
+    ntrials = trials.shape[0]
+    for i in range(niter):
+        tr = np.arange(ntrials)
+        random.shuffle(tr)
+        tr1 = tr[:int(len(tr)/2)]
+        tr2 = tr[int(len(tr)/2):]
+        rec1 = get_metric_from_trials_base(trials[tr1], meta)
+        rec2 = get_metric_from_trials_base(trials[tr2], meta)
+        for fn in metrics:
             rec[fn].append([rec1, rec2])
     return rec
 
-def compute_behavioral_metrics(trials, meta, niter=10):
-    # main call
-    trial_sh = get_trial_splithalves(trials,niter=niter)
-    rec = get_metric_from_trials(trial_sh, meta)
-    return rec
 
 
 """
