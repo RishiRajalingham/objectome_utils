@@ -24,48 +24,6 @@ def dprime_from2x2(C):
     corr_rej = 1-fp_
     return dprime, balacc, hitrate, corr_rej
 
-def get_imgdata_from_trials_base(trials, meta):
-    """ trials to imgdata (per split) """
-    uobjs = list(set(meta['obj']))
-    uimgs = [m['id'] for m in meta if m['obj'] in uobjs]
-    nimgs = len(uimgs)
-
-    labels = np.concatenate((uimgs, uobjs))
-    
-    choice = confusion_matrix(trials['id'], trials['choice'], labels)[:nimgs,nimgs:]
-    true = confusion_matrix(trials['id'], trials['sample_obj'], labels)[:nimgs,nimgs:]
-    selection = confusion_matrix(trials['id'], trials['dist_obj'], labels)[:len(uimgs),len(uimgs):]
-    selection = selection + true
-
-    return {'choice': np.array(choice), 
-            'selection': np.array(selection), 
-            'true': np.array(true)
-            }
-
-def get_imgdata_from_trials(trials, meta, niter=10):
-    """ trials to imgdata """
-    imgdata = []
-    if isinstance(trials, list):
-        niter = len(trials)
-    for i in range(niter):
-        if isinstance(trials, list): # trial splits are precomputed over the raw data (e.g. reps)
-            id1 = get_imgdata_from_trials_base(trials[i][0], meta)
-            id2 = get_imgdata_from_trials_base(trials[i][1], meta)
-        else: # trials are split into random halves
-            ntrials = trials.shape[0]
-            tr = np.arange(ntrials)
-            random.shuffle(tr)
-            tr1 = tr[:int(len(tr)/2)]
-            tr2 = tr[int(len(tr)/2):]
-            id1 = get_imgdata_from_trials_base(trials[tr1], meta)
-            id2 = get_imgdata_from_trials_base(trials[tr2], meta)
-
-        imgdata_tmp = []
-        imgdata_tmp.append(id1)
-        imgdata_tmp.append(id2)
-        imgdata.append(imgdata_tmp)
-    return imgdata
-
 def get_trial_splithalves(trials,niter=10):
     trial_splithalves = []
     for i in range(niter):
@@ -80,149 +38,6 @@ def get_trial_splithalves(trials,niter=10):
         trial_splithalves.append(tsh_tmp)
 
     return trial_splithalves
-
-def get_img_dprime_from_imgdata(imgdata, img_i, dist_obj_i=None):
-    """ get dprime computed for image img_i, based on distracters dist_obj_i.
-    can be used to compute both I1 (over any set of distracters) and I2.
-    """
-    if sum(imgdata['selection'][img_i,:]) == 0:
-        return np.nan, np.nan  # img wasn't shown
-    if dist_obj_i == None:
-        obj_i = range(imgdata['true'].shape[1])
-    else:
-        lab = np.nonzero(imgdata['true'][img_i,:] > 0)[0][0]
-        obj_i = np.unique([dist_obj_i, lab])
-    
-    if len(obj_i) == 1:
-        return np.nan, np.nan  # distracter is label
-    if (imgdata['selection'][img_i,dist_obj_i] == 0).all():
-        return np.nan, np.nan  # img wasn't shown w these distracter
-
-    nobjs = len(obj_i)
-    true_ = imgdata['true'][:,obj_i]
-    choice_ = imgdata['choice'][:,obj_i]
-    selection_ = imgdata['selection'][:,obj_i]
-
-    # what obj is img_i?
-    t = np.nonzero(true_[img_i,:] > 0)[0][0]
-    # all negative images
-    t_i = np.nonzero(true_[:,t] == 0)[0] 
-
-    # order positive + negatives images
-    ind = np.concatenate(([img_i],t_i))
-    # order positive + negative objs 
-    ind2 = list(set(range(nobjs))-set([t]))
-    ind2 = np.hstack(([t], ind2)) 
-
-    hitmat_curr = choice_ / (1.0*selection_)
-    hitmat_curr = hitmat_curr[ind,:]
-
-    return dprime_from2x2(hitmat_curr[:,ind2])
-
-def get_metric_from_imgdata_base(imgdata_s, compute_metrics={'I1_dprime', 'I2_dprime'}, rec_precomputed={}):
-    """ imgdata to metrics (per split) """
-    nimgs, nobjs = imgdata_s['true'].shape
-    hitrates_ = imgdata_s['choice'] / (1.0*imgdata_s['selection'])
-    hitrates_[imgdata_s['true'] > 0] = np.nan    
-    
-    rec = rec_precomputed
-
-    if 'O2_dprime' in compute_metrics:
-        rec['O2_dprime'] = get_o2_from_imgdata(imgdata_s)
-
-    if 'I1_hitrate' in compute_metrics:
-        rec['I1_hitrate'] = 1.0 - np.nanmean(hitrates_,1)
-        rec['I1_hitrate_z'] = np.ones((nimgs,)) * np.nan
-        rec['I1_hitrate_c'] = np.ones((nimgs,)) * np.nan
-        rec['I1_dprime'] = np.ones((nimgs,)) * np.nan
-        rec['I1_dprime_z'] = np.ones((nimgs,)) * np.nan
-        rec['I1_dprime_c'] = np.ones((nimgs,)) * np.nan
-        rec['I1_accuracy'] = np.ones((nimgs,)) * np.nan
-        rec['I1_accuracy_z'] = np.ones((nimgs,)) * np.nan
-        rec['I1_accuracy_c'] = np.ones((nimgs,)) * np.nan
-
-    if 'I2_hitrate' in compute_metrics:
-        rec['I2_hitrate'] = deepcopy(hitrates_)
-        rec['I2_hitrate_z'] = np.ones((nimgs,nobjs)) * np.nan
-        rec['I2_hitrate_c'] = np.ones((nimgs,nobjs)) * np.nan
-        rec['I2_dprime'] = np.ones((nimgs,nobjs)) * np.nan
-        rec['I2_dprime_z'] = np.ones((nimgs,nobjs)) * np.nan
-        rec['I2_dprime_c'] = np.ones((nimgs,nobjs)) * np.nan
-        rec['I2_accuracy'] = np.ones((nimgs,nobjs)) * np.nan
-        rec['I2_accuracy_z'] = np.ones((nimgs,nobjs)) * np.nan
-        rec['I2_accuracy_c'] = np.ones((nimgs,nobjs)) * np.nan
-
-    for ii in range(nimgs):
-        if 'I1_dprime' in compute_metrics:
-            rec['I1_dprime'][ii],rec['I1_accuracy'][ii] = get_img_dprime_from_imgdata(imgdata_s, ii)
-        if 'I2_dprime' in compute_metrics:
-            for jj in range(nobjs):
-                rec['I2_dprime'][ii,jj],rec['I2_accuracy'][ii,jj] = get_img_dprime_from_imgdata(imgdata_s, ii, jj)
-
-    for ii in range(nobjs):
-        t_i = np.nonzero(imgdata_s['true'][:,ii] > 0)[0]
-        rec['I1_hitrate_z'][t_i] = nanzscore(rec['I1_hitrate'][t_i])
-        rec['I1_hitrate_c'][t_i] = nanzscore(rec['I1_hitrate'][t_i], mean_only=True)
-        if 'I1_dprime' in compute_metrics:
-            rec['I1_dprime_z'][t_i] = nanzscore(rec['I1_dprime'][t_i])
-            rec['I1_dprime_c'][t_i] = nanzscore(rec['I1_dprime'][t_i], mean_only=True)
-            rec['I1_accuracy_z'][t_i] = nanzscore(rec['I1_accuracy'][t_i])
-            rec['I1_accuracy_c'][t_i] = nanzscore(rec['I1_accuracy'][t_i], mean_only=True)
-
-        if 'I2_dprime' in compute_metrics:
-            for jj in range(nobjs):
-                rec['I2_hitrate_z'][t_i,jj] = nanzscore(rec['I2_hitrate'][t_i,jj])
-                rec['I2_hitrate_c'][t_i,jj] = nanzscore(rec['I2_hitrate'][t_i,jj], mean_only=True)
-                rec['I2_dprime_z'][t_i,jj] = nanzscore(rec['I2_dprime'][t_i,jj])
-                rec['I2_dprime_c'][t_i,jj] = nanzscore(rec['I2_dprime'][t_i,jj], mean_only=True)
-                rec['I2_accuracy_z'][t_i,jj] = nanzscore(rec['I2_accuracy'][t_i,jj])
-                rec['I2_accuracy_c'][t_i,jj] = nanzscore(rec['I2_accuracy'][t_i,jj], mean_only=True)
-        
-    return rec
-
-def get_metric_from_imgdata(imgdata, compute_metrics={'I1_dprime'}, rec_precomputed={}):
-    """ imgdata to metrics """    
-    rec = rec_precomputed
-
-    for fn in compute_metrics:
-        rec[fn] = []
-    for i in range(len(imgdata)):
-        rec1 = get_metric_from_imgdata_base(imgdata[i][0], compute_metrics=compute_metrics, rec_precomputed=rec)
-        rec2 = get_metric_from_imgdata_base(imgdata[i][1], compute_metrics=compute_metrics, rec_precomputed=rec)
-
-        for fn in rec1.keys():
-            rec_tmp = []
-            rec_tmp.append(rec1[fn])
-            rec_tmp.append(rec2[fn])
-            rec[fn].append(rec_tmp)
-    return rec
-
-def compute_behavioral_metrics(trials, meta, compute_metrics={'I1_dprime'}, niter=10, imgdata=None, rec_precomputed={}):
-    """ Main function to get metrics from trials """
-    if imgdata == None:
-        imgdata = get_imgdata_from_trials(trials, meta, niter=niter)
-
-    rec = get_metric_from_imgdata(imgdata, compute_metrics=compute_metrics, rec_precomputed=rec_precomputed)
-
-    return rec, imgdata
-
-def subsample_imgdata(imgdata, img_i=None, obj_i=None):
-
-    if img_i == None:
-        img_i = range(imgdata[0][0]['true'].shape[0])
-    if obj_i == None:
-        obj_i = range(imgdata[0][0]['true'].shape[1])
-    imgdata_sub = deepcopy(imgdata)
-    for i in range(len(imgdata)):
-        for j in range(2):
-            for fn in imgdata[i][j].keys():
-                tmp = imgdata[i][j][fn][img_i,:]
-                imgdata_sub[i][j][fn] = tmp[:,obj_i]
-    return imgdata_sub
-
-""" Alternative methods for computing metrics directly from trials. Conversion to imgdata may be incorrect 
-for I2/O2 computations, as it doesn't split trials into tasks first. """
-
 
 def get_metric_from_trials_base(trials, meta):
 
@@ -338,7 +153,7 @@ def get_metric_from_trials(trials, meta):
             rec[fn].append([rec1, rec2])
     return rec
 
-def trials_to_metrics(trials, meta, niter=10):
+def compute_behavioral_metrics(trials, meta, niter=10):
     # main call
     trial_sh = get_trial_splithalves(trials,niter=niter)
     rec = get_metric_from_trials(trial_sh, meta)

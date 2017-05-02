@@ -90,24 +90,6 @@ def features2trials(features, meta, opt=OPT_DEFAULT, outfn=None):
     return trials
 
 
-def features2trials_spec(features, meta, opt, trial_outpath):
-    for subsample in [100,500,1000]:
-        for npc_train in [10,30,50]:
-            for classifiertype in ['svm','mcc', 'knn']:
-                opt_curr = copy.deepcopy(opt)
-                opt_curr['subsample'] = subsample
-                opt_curr['classifiertype'] = classifiertype
-                opt_curr['npc_train'] = npc_train
-                spec_suffix = '%s.f%d.t%d' % (classifiertype,subsample,npc_train)
-                model_spec = opt_curr['model_spec'] + spec_suffix
-                opt_curr['model_spec'] = model_spec
-
-                trials = features2trials(features, meta, opt=opt_curr)
-
-                outfn = trial_outpath + model_spec + '.pkl'
-                pk.dump(trials, open(outfn, 'wb'))
-    return 
-
 def run_important_ones():
     datapath = obj.dicarlolab_homepath + 'monkey_objectome/behavioral_benchmark/data/'
     feature_path = obj.dicarlolab_homepath + 'stimuli/objectome24s100/features/'
@@ -123,18 +105,24 @@ def run_important_ones():
     meta_id_list = list(meta['id'])
     im240 = [meta_id_list.index(ii) for ii in imgids]
 
-    for classifiertype in ['mcc', 'knn']:
-        opt = copy.deepcopy(OPT_DEFAULT)
-        opt['classifiertype'] = classifiertype
-        opt['train_q'] = lambda x: (x['id'] not in set(imgids))
-        opt['test_q'] = lambda x: (x['id'] in set(imgids))
+    for mod in models:
+        feature_fn = feature_path + mod + '.npy'
+        features = np.load(feature_fn)
 
-        for mod in models:
-            feature_fn = feature_path + mod + '.npy'
-            features = np.load(feature_fn)
-            opt['model_spec'] = mod
-            outpath = trial_path + 'im240/'
-            trials = features2trials(features, meta, opt=opt, outfn=outpath)
+        for classifiertype in ['svm', 'mcc', 'knn']:
+            for subsample in [100,500,1000]:
+                for npc_train in [10,30,50]:
+                    if (subsample == 1000) & (npc_train == 50):
+                        continue
+                    opt = copy.deepcopy(OPT_DEFAULT)
+                    opt['classifiertype'] = classifiertype
+                    opt['subsample'] = subsample
+                    opt['npc_train'] = npc_train
+                    opt['train_q'] = lambda x: (x['id'] not in set(imgids))
+                    opt['test_q'] = lambda x: (x['id'] in set(imgids))
+                    opt['model_spec'] = mod
+                    outpath = trial_path + 'im240/'
+                    trials = features2trials(features, meta, opt=opt, outfn=outpath)
     return
 
 
