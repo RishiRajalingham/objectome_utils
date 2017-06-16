@@ -25,13 +25,129 @@ def dprime_from2x2(C):
     return dprime, balacc, hitrate, corr_rej
 
 
-def get_metric_from_trials_base(trials, meta):
+def get_metric_from_probs_base(trials, meta, metric_spec='all'):
 
     uobjs = list(set(meta['obj']))
     nobjs = len(uobjs)
     uimgs = list(meta['id'])
     nimgs = len(uimgs)
 
+    rec = {}
+
+    rec['O2_dprime'] = np.ones((nobjs, nobjs)) * np.nan
+    rec['O2_accuracy'] = np.ones((nobjs, nobjs)) * np.nan
+    rec['O2_hitrate'] = np.ones((nobjs, nobjs)) * np.nan
+
+    rec['O2_dprime_exp'] = np.ones((nimgs, nobjs)) * np.nan
+    rec['O2_accuracy_exp'] = np.ones((nimgs, nobjs)) * np.nan
+    rec['O2_hitrate_exp'] = np.ones((nimgs, nobjs)) * np.nan
+
+    rec['I2_dprime']  = np.ones((nimgs,nobjs)) * np.nan
+    rec['I2_accuracy']  = np.ones((nimgs,nobjs)) * np.nan
+    rec['I2_hitrate']  = np.ones((nimgs,nobjs)) * np.nan
+    rec['I2_dprime_c']  = np.ones((nimgs,nobjs)) * np.nan
+    rec['I2_accuracy_c']  = np.ones((nimgs,nobjs)) * np.nan
+    rec['I2_hitrate_c']  = np.ones((nimgs,nobjs)) * np.nan
+
+    # precompute a bunch of logicals
+    summary = [{'sam':[],'dist':[],'choice':[],'imgind':[]} for i in range(nobjs)]
+    for i,OI in enumerate(uobjs):
+        summary[i]['sam'] = (trials['sample_obj'] == OI)
+        summary[i]['dist'] = (trials['dist_obj'] == OI)
+        summary[i]['imgind'] = np.array([uimgs.index(m['id']) for m in meta if (m['obj'] == OI) ])
+
+    for i in range(nobjs):   
+        img_ind_i = summary[i]['imgind']
+        for j in range(i+1, nobjs):
+            img_ind_j = summary[j]['imgind']
+
+            cont_table = np.zeros((2,2))
+            ti = summary[i]['sam'] & summary[j]['dist']
+            tj = summary[j]['sam'] & summary[i]['dist'] 
+            xi = np.array(trials['prob_choice'][ti]).astype('double')
+            xj = np.array(trials['prob_choice'][tj]).astype('double')
+            cont_table[0,0] = np.nanmean(xi)
+            cont_table[0,1] = 1 - np.nanmean(xi)
+            cont_table[1,0] = 1 - np.nanmean(xj)
+            cont_table[1,1] = np.nanmean(xj)
+            dp,ba,hr,cr = dprime_from2x2(cont_table)
+            rec['O2_dprime'][i,j] = dp
+            rec['O2_accuracy'][i,j] = ba
+            rec['O2_hitrate'][i,j] = hr
+            rec['O2_hitrate'][j,i] = cr
+
+            for ii,jj in zip(img_ind_i, img_ind_j):
+                rec['O2_dprime_exp'][ii,j] = dp
+                rec['O2_hitrate_exp'][ii,j] = hr
+                rec['O2_accuracy_exp'][ii,j] = ba
+                rec['O2_dprime_exp'][jj,i] = dp
+                rec['O2_hitrate_exp'][jj,i] = cr
+                rec['O2_accuracy_exp'][jj,i] = ba
+
+        if metric_spec != 'all':
+            continue
+
+        for j in range(nimgs):
+            t_j = trials['id'] == uimgs[j] 
+            OJ = meta[meta['id'] == uimgs[j]]['obj']
+            j_ = uobjs.index(OJ)
+            if j_ == i:
+                continue
+            cont_table = np.zeros((2,2))
+            # read this next line as trials with: sample j, distracter I, choice J.
+
+            ti = t_j & summary[i]['dist'] 
+            tj = summary[i]['sam'] & summary[j_]['dist']
+            xi = np.array(trials['prob_choice'][ti]).astype('double')
+            xj = np.array(trials['prob_choice'][tj]).astype('double')
+
+            cont_table[0,0] = np.nanmean(xi)
+            cont_table[0,1] = 1 - np.nanmean(xi)
+            cont_table[1,0] = 1 - np.nanmean(xj)
+            cont_table[1,1] = np.nanmean(xj)
+
+            dp,ba,hr,cr = dprime_from2x2(cont_table)
+            rec['I2_dprime'][j,i] = dp
+            rec['I2_accuracy'][j,i] = ba
+            rec['I2_hitrate'][j,i] = hr
+
+    rec['I2_dprime_c']= rec['I2_dprime'] - rec['O2_dprime_exp']
+    rec['I2_accuracy_c'] = rec['I2_accuracy'] - rec['O2_accuracy_exp']
+    rec['I2_hitrate_c'] = rec['I2_hitrate'] - rec['O2_hitrate_exp']
+
+    rec['I1_dprime'] = np.nanmean(rec['I2_dprime'], 1)
+    rec['I1_accuracy'] = np.nanmean(rec['I2_accuracy'], 1)
+    rec['I1_hitrate'] = np.nanmean(rec['I2_hitrate'], 1)
+
+    rec['I1_dprime_c'] = np.nanmean(rec['I2_dprime_c'], 1)
+    rec['I1_accuracy_c'] = np.nanmean(rec['I2_accuracy_c'], 1)
+    rec['I1_hitrate_c'] = np.nanmean(rec['I2_hitrate_c'], 1)
+
+    return rec
+
+def compute_behavioral_metrics_v2(trials, meta, niter, metric_spec='all'):
+    metrics = [
+        'mO2_dprime', 'O2_accuracy', 'O2_hitrate', 
+        'pI2_dprime', 'I2_accuracy', 'I2_hitrate', 
+        'oI1_dprime', 'I1_accuracy', 'I1_hitrate', 
+        'oI2_dprime_c', 'I2_accuracy_c', 'I2_hitrate_c', 
+        'oI1_dprime_c', 'I1_accuracy_c', 'I1_hitrate_c'
+        ]
+    rec = {k: [] for k in metrics}
+         
+    for i in range(niter):
+        rec_ = get_metric_from_probs_base(trials, meta, metric_spec=metric_spec)
+        for fn in metrics:
+        	rec[fn].append([rec_[fn], rec_[fn]])
+    return rec
+         
+def get_mietric_from_trials_base(trials, meta, metric_spec='all'):
+          
+    uobjse = list(set(meta['obj']))
+    nobjso = len(uobjs)
+    uimgs  = list(meta['id'])
+    nimgsd = len(uimgs)
+         
     rec = {}
 
     rec['O2_dprime'] = np.ones((nobjs, nobjs)) * np.nan
@@ -74,13 +190,17 @@ def get_metric_from_trials_base(trials, meta):
             rec['O2_hitrate'][i,j] = hr
             rec['O2_hitrate'][j,i] = cr
 
-            rec['O2_dprime_exp'][img_ind_i,:][:,j] = dp
-            rec['O2_dprime_exp'][img_ind_j,:][:,i] = dp
-            rec['O2_hitrate_exp'][img_ind_i,:][:,j] = hr
-            rec['O2_hitrate_exp'][img_ind_j,:][:,i] = cr
-            rec['O2_accuracy_exp'][img_ind_i,:][:,j] = ba
-            rec['O2_accuracy_exp'][img_ind_j,:][:,i] = ba
-            
+            for ii,jj in zip(img_ind_i, img_ind_j):
+                rec['O2_dprime_exp'][ii,j] = dp
+                rec['O2_hitrate_exp'][ii,j] = hr
+                rec['O2_accuracy_exp'][ii,j] = ba
+                rec['O2_dprime_exp'][jj,i] = dp
+                rec['O2_hitrate_exp'][jj,i] = cr
+                rec['O2_accuracy_exp'][jj,i] = ba
+
+        if metric_spec != 'all':
+            continue
+
         for j in range(nimgs):
             t_j = trials['id'] == uimgs[j] 
             OJ = meta[meta['id'] == uimgs[j]]['obj']
@@ -113,7 +233,7 @@ def get_metric_from_trials_base(trials, meta):
 
     return rec
 
-def compute_behavioral_metrics(trials, meta, niter):
+def compute_behavioral_metrics(trials, meta, niter, metric_spec='all'):
     metrics = [
         'O2_dprime', 'O2_accuracy', 'O2_hitrate', 
         'I2_dprime', 'I2_accuracy', 'I2_hitrate', 
@@ -129,10 +249,10 @@ def compute_behavioral_metrics(trials, meta, niter):
         random.shuffle(tr)
         tr1 = tr[:int(len(tr)/2)]
         tr2 = tr[int(len(tr)/2):]
-        rec1 = get_metric_from_trials_base(trials[tr1], meta)
-        rec2 = get_metric_from_trials_base(trials[tr2], meta)
+        rec1 = get_metric_from_trials_base(trials[tr1], meta, metric_spec=metric_spec)
+        rec2 = get_metric_from_trials_base(trials[tr2], meta, metric_spec=metric_spec)
         for fn in metrics:
-            rec[fn].append([rec1, rec2])
+            rec[fn].append([rec1[fn], rec2[fn]])
     return rec
 
 

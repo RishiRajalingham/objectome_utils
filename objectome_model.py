@@ -11,11 +11,11 @@ OPT_DEFAULT = {
     'classifiertype':'svm',
     'npc_train':50,
     'npc_test':10,
-    'n_splits':10,
+    'n_splits':1,
     'train_q':{},
     'test_q':{},
     'objects_oi':obj.models_combined24,
-    'nsamples_noisemodel':10,
+    'nsamples_noisemodel':1,
     'noise_model':None,
     'subsample':1000,
     'model_spec':''
@@ -24,7 +24,7 @@ OPT_DEFAULT = {
 METRIC_KWARGS = {
     'svm': {'model_type': 'libSVM', 
         'model_kwargs': {'C': 50000, 'class_weight': 'auto',
-        'kernel': 'linear'}},
+        'kernel': 'linear', 'probability':True}},
     'mcc':  {'model_type': 'MCC2',
         'model_kwargs': {'fnorm': True, 'snorm': False}},
     'rbfsvm': {'model_type': 'libSVM', 
@@ -89,13 +89,69 @@ def features2trials(features, meta, opt=OPT_DEFAULT, outfn=None):
         print 'Saved ' + outfn + ' \n ' + str(trials.shape[0])
     return trials
 
+def features2probs_pertask(features_task, meta_task, opt):
+    """ instead of trials, output for each image and distracter, a probability estimate of hit rate"""
+    evalc = {'ctypes': [('dp_standard', 'dp_standard', {'kwargs': {'error': 'std'}})],
+         'labelfunc': 'obj',
+         'metric_kwargs': METRIC_KWARGS[opt['classifiertype']],
+         'metric_screen': 'classifier',
+         'npc_test': opt['npc_test'],
+         'npc_train': opt['npc_train'],
+         'npc_validate': 0,
+         'num_splits': opt['n_splits'],
+         'split_by': 'obj',
+         'split_seed': random.seed(),
+         'test_q': opt['test_q'],
+         'train_q': opt['train_q'],
+         'use_validation': False
+         }
+    rec = utils.compute_metric_base(features_task, meta_task, evalc, attach_models=True, return_splits=True)
+    trial_records = []
+    for s_i, s_res in enumerate(rec['split_results']):
+        mod = s_res['model']
+        split_ind = rec['splits'][0][s_i]['test']
+        imgid = meta_task[split_ind]['id']
+        proba = mod.predict_proba(features_task[split_ind,:])
+        true_label = meta_task[split_ind]['obj']
+        labelset = list(s_res['labelset'])
+        distr_label = [np.setdiff1d(labelset,np.array(pl))[0] for pl in meta_task[split_ind]['obj']]
 
-def run_important_ones():
+        for i, l in enumerate(true_label):
+            prob_a_ = proba[i,labelset.index(l)]
+            rec_curr = (true_label[i],) + (distr_label[i],) + (prob_a_,) + (imgid[i],) + ('ModelID',) + (opt['model_spec'],) 
+            trial_records.append(rec_curr)
+        
+    KW_NAMES = ['sample_obj', 'dist_obj', 'prob_choice', 'id', 'WorkerID', 'AssignmentID']
+    KW_FORMATS = ['|S40','|S40','|S40','|S40','|S40','|S40']
+    return tb.tabarray(records=trial_records, names=KW_NAMES, formats=KW_FORMATS)
+
+def features2probs(features, meta, opt=OPT_DEFAULT, outfn=None):
+    tasks = obj.getBinaryTasks(meta, np.array(opt['objects_oi']))
+    all_trials = ()
+    for isample in range(opt['nsamples_noisemodel']):
+        features_sample = obj.sampleFeatures(features, opt['noise_model'], opt['subsample'])
+        for task in tasks:
+            task_ind = np.squeeze(task)
+            trials = features2probs_pertask(features_sample[task_ind,:], meta[task_ind], opt)
+            all_trials = all_trials + (trials,)
+    trials = tb.rowstack(all_trials)
+    
+    if outfn != None:
+        spec_suffix = 'prob_%s.f%d.t%d' % (opt['classifiertype'],opt['subsample'],opt['npc_train'])
+        model_spec = opt['model_spec'] + spec_suffix
+        outfn = outfn + model_spec + '.pkl'
+        pk.dump(trials, open(outfn, 'wb'))
+        print 'Saved ' + outfn + ' \n ' + str(trials.shape[0])
+    return trials
+
+def run_important_ones(models=None, imgset='im240'):
     datapath = obj.dicarlolab_homepath + 'monkey_objectome/behavioral_benchmark/data/'
     feature_path = obj.dicarlolab_homepath + 'stimuli/objectome24s100/features/'
     trial_path = datapath + 'trials/'
-    models  = ['ALEXNET_fc6', 'ALEXNET_fc7','ALEXNET_fc8','VGG_fc6','VGG_fc7','VGG_fc8','RESNET101_conv5',
-        'GOOGLENET_pool5','GOOGLENETv3_pool5']
+    if models == None:
+        # models  = ['ALEXNET_fc6', 'ALEXNET_fc7','ALEXNET_fc8','VGG_fc6','VGG_fc7','VGG_fc8','RESNET101_conv5',
+        #     'GOOGLENET_pool5','GOOGLENETv3_pool5']
+        models  = ['GOOGLENETv3_pool5_synth34000', 'GOOGLENETv3_pool5_retina']
 
     meta = obj.objectome24_meta()
     uobj = list(set(meta['obj']))
@@ -109,20 +165,25 @@ def run_important_ones():
         feature_fn = feature_path + mod + '.npy'
         features = np.load(feature_fn)
 
-        for classifiertype in ['svm', 'mcc', 'knn']:
-            for subsample in [100,500,1000]:
-                for npc_train in [10,30,50]:
-                    if (subsample == 1000) & (npc_train == 50):
-                        continue
+        for classifiertype in ['svm']:#, 'mcc', 'knn']:
+            for subsample in [1000]:# [100,500,1000]:
+                for npc_train in [10]:#[10,30,50]:
                     opt = copy.deepcopy(OPT_DEFAULT)
                     opt['classifiertype'] = classifiertype
                     opt['subsample'] = subsample
                     opt['npc_train'] = npc_train
-                    opt['train_q'] = lambda x: (x['id'] not in set(imgids))
-                    opt['test_q'] = lambda x: (x['id'] in set(imgids))
+                    
+                    if imgset == 'im240':
+                        opt['train_q'] = lambda x: (x['id'] not in set(imgids))
+                        opt['test_q'] = lambda x: (x['id'] in set(imgids))
+                    elif imgset == 'im2400':
+                        opt['train_q'] = {}
+                        opt['test_q'] = {}
+
+                    outpath = trial_path + imgset + '/'
                     opt['model_spec'] = mod
-                    outpath = trial_path + 'im240/'
-                    trials = features2trials(features, meta, opt=opt, outfn=outpath)
+                    
+                    trials = features2probs(features, meta, opt=opt, outfn=outpath)
     return
 
 
