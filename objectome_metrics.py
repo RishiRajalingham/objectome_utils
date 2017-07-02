@@ -1,15 +1,17 @@
 import random
 import numpy as np
 from scipy.stats import norm, pearsonr, spearmanr
-from sklearn.metrics import confusion_matrix
-from copy import deepcopy
 from objectome_utils import nanzscore
 
 
-""" 
-Basic metric computations from aggregated trials to random split-halves of 
+"""
+Basic metric computations from aggregated trials to random split-halves of
 trials, image data (summary data structure), and metrics.
 """
+
+import warnings
+warnings.filterwarnings("ignore",category=DeprecationWarning)
+warnings.filterwarnings("ignore",category=RuntimeWarning)
 
 def dprime_from2x2(C):
     """ Input matrix C is essentially a 2x2 confusion matrix, 
@@ -23,7 +25,6 @@ def dprime_from2x2(C):
     hitrate = hr_
     corr_rej = 1-fp_
     return dprime, balacc, hitrate, corr_rej
-
 
 def get_metric_from_probs_base(trials, meta, metric_spec='all'):
 
@@ -125,28 +126,12 @@ def get_metric_from_probs_base(trials, meta, metric_spec='all'):
 
     return rec
 
-def compute_behavioral_metrics_v2(trials, meta, niter, metric_spec='all'):
-    metrics = [
-        'mO2_dprime', 'O2_accuracy', 'O2_hitrate', 
-        'pI2_dprime', 'I2_accuracy', 'I2_hitrate', 
-        'oI1_dprime', 'I1_accuracy', 'I1_hitrate', 
-        'oI2_dprime_c', 'I2_accuracy_c', 'I2_hitrate_c', 
-        'oI1_dprime_c', 'I1_accuracy_c', 'I1_hitrate_c'
-        ]
-    rec = {k: [] for k in metrics}
-         
-    for i in range(niter):
-        rec_ = get_metric_from_probs_base(trials, meta, metric_spec=metric_spec)
-        for fn in metrics:
-        	rec[fn].append([rec_[fn], rec_[fn]])
-    return rec
-         
-def get_mietric_from_trials_base(trials, meta, metric_spec='all'):
+def get_metric_from_trials_base(trials, meta, metric_spec='all'):
           
-    uobjse = list(set(meta['obj']))
-    nobjso = len(uobjs)
+    uobjs = list(set(meta['obj']))
+    nobjs = len(uobjs)
     uimgs  = list(meta['id'])
-    nimgsd = len(uimgs)
+    nimgs = len(uimgs)
          
     rec = {}
 
@@ -233,7 +218,14 @@ def get_mietric_from_trials_base(trials, meta, metric_spec='all'):
 
     return rec
 
-def compute_behavioral_metrics(trials, meta, niter, metric_spec='all'):
+def get_metric_base(trials, meta, prob_estimate=False, metric_spec='all'):
+    if prob_estimate:
+        rec = get_metric_from_probs_base(trials, meta, metric_spec=metric_spec)
+    else:
+        rec = get_metric_from_trials_base(trials, meta, metric_spec=metric_spec)
+    return rec
+
+def compute_behavioral_metrics(trials, meta, niter, prob_estimate=False, metric_spec='all', noise_model='trial_samples'):
     metrics = [
         'O2_dprime', 'O2_accuracy', 'O2_hitrate', 
         'I2_dprime', 'I2_accuracy', 'I2_hitrate', 
@@ -241,28 +233,38 @@ def compute_behavioral_metrics(trials, meta, niter, metric_spec='all'):
         'I2_dprime_c', 'I2_accuracy_c', 'I2_hitrate_c', 
         'I1_dprime_c', 'I1_accuracy_c', 'I1_hitrate_c'
         ]
+
+    if noise_model == None:
+        # run on all trials just once without any sampling
+        rec_all = get_metric_base(trials, meta, prob_estimate=prob_estimate, metric_spec=metric_spec)
+
     rec = {k: [] for k in metrics}
     
     ntrials = trials.shape[0]
     for i in range(niter):
-        tr = np.arange(ntrials)
-        random.shuffle(tr)
-        tr1 = tr[:int(len(tr)/2)]
-        tr2 = tr[int(len(tr)/2):]
-        rec1 = get_metric_from_trials_base(trials[tr1], meta, metric_spec=metric_spec)
-        rec2 = get_metric_from_trials_base(trials[tr2], meta, metric_spec=metric_spec)
+        if noise_model == None:
+            rec1 = rec_all
+            rec2 = rec_all
+        else: # if noise_model == 'trial_samples':
+            tr = np.arange(ntrials)
+            random.shuffle(tr)
+            tr1 = tr[:int(len(tr)/2)]
+            tr2 = tr[int(len(tr)/2):]
+            rec1 = get_metric_base(trials[tr1], meta, prob_estimate=prob_estimate, metric_spec=metric_spec)
+            rec2 = get_metric_base(trials[tr2], meta, prob_estimate=prob_estimate, metric_spec=metric_spec)
         for fn in metrics:
             rec[fn].append([rec1[fn], rec2[fn]])
     return rec
-
-
+     
 
 """
 Methods for measuring consistency of output metric
 """
-
 def get_mean_behavior(b1, metricn):
     return np.squeeze(np.nanmean(np.nanmean(b1[metricn], axis=1), axis=0))
+
+def get_mean_behavior_v2(b1, metricn):
+    return rec[metricn]['all']
 
 def nnan_consistency(A,B, corrtype='pearson'):
     ind = np.isfinite(A) & np.isfinite(B)
@@ -270,6 +272,61 @@ def nnan_consistency(A,B, corrtype='pearson'):
         return pearsonr(A[ind], B[ind])[0]
     elif corrtype == 'spearman':
         return spearmanr(A[ind], B[ind])[0]
+
+def pairwise_consistency_v2(A,B, metricn='I1_dprime_z', corrtype='pearson', img_subsample=None):
+
+    out_1 = {'IC_a':[], 'IC_b':[], 'rho':[], 'rho_n':[], 'rho_n_sq':[]} #use prediction formula 
+    out_2 = {'IC_a':[], 'IC_b':[], 'rho':[], 'rho_n':[], 'rho_n_sq':[]} #use split halves for all correlations
+
+    # raw correlation of metric estimated from all data
+    A_, B_ = A[metricn]['all'], B[metricn]['all']
+    if img_subsample is not None:
+        if A_.ndim == 1:
+            A_, B_ = A_[img_subsample], B_[img_subsample]
+        else:
+            A_, B_ = A_[img_subsample, :], B_[img_subsample, :]
+    rho = nnan_consistency(A_, B_, corrtype)
+    out_1['rho'] = rho
+
+    # internal consistency estimated from split halves
+    A_s, B_s = A[metricn]['splits'], B[metricn]['splits']
+    niter = min(len(A_s), len(B_s))
+    for i in range(niter):
+        a0, a1 = A_s[i][0], A_s[i][1]
+        b0, b1 = B_s[i][0], B_s[i][1]
+        if img_subsample is not None:
+            if a0.ndim == 1:
+                a0, a1 = a0[img_subsample], a1[img_subsample]
+                b0, b1 = b0[img_subsample], b1[img_subsample]
+            else:
+                a0, a1 = a0[img_subsample, :], a1[img_subsample, :]
+                b0, b1 = b0[img_subsample, :], b1[img_subsample, :]
+        ic_a_2 = nnan_consistency(a0, a1, corrtype)
+        ic_b_2 = nnan_consistency(b0, b1, corrtype)
+        rho_tmp = []
+        rho_tmp.append(nnan_consistency(a0,b0, corrtype))
+        rho_tmp.append(nnan_consistency(a1,b0, corrtype))
+        rho_tmp.append(nnan_consistency(a0,b1, corrtype))
+        rho_tmp.append(nnan_consistency(a1,b1, corrtype))
+        rho_2 = np.nanmean(rho_tmp)
+
+        out_2['rho'].append(rho_2)
+        out_2['IC_a'].append(ic_a_2)
+        out_2['IC_b'].append(ic_b_2)
+
+        # spearman brown correction
+        ic_a_1 = 2*ic_a_2 / (1+ic_a_2)
+        ic_b_1 = 2*ic_b_2 / (1+ic_b_2)
+        out_1['IC_a'].append(ic_a_1)
+        out_1['IC_b'].append(ic_b_1)
+
+        out_1['rho_n'].append(rho / ((ic_a_1*ic_b_1)**0.5))
+        out_2['rho_n'].append(rho_2 / ((ic_a_2*ic_b_2)**0.5))
+
+        out_1['rho_n_sq'].append((rho**2) / ((ic_a_1*ic_b_1)))
+        out_2['rho_n_sq'].append((rho_2**2) / ((ic_a_2*ic_b_2)))
+
+    return out_1, out_2
 
 def pairwise_consistency_perobj(A,B, metricn, uobj, corrtype='pearson'):
     niter = min(len(A), len(B))
@@ -313,34 +370,30 @@ def pairwise_consistency(A,B, metricn='I1_dprime_z', corrtype='pearson', img_sub
         a0,a1 = A[metricn][i][0], A[metricn][i][1]
         b0,b1 = B[metricn][i][0], B[metricn][i][1]
         
-        if img_subsample != None:
+        if img_subsample is not None:
             if a0.ndim == 1:
-                a0,a1 = a0[img_subsample], a1[img_subsample]
-                b0,b1 = b0[img_subsample], b1[img_subsample]
+                a0, a1 = a0[img_subsample], a1[img_subsample]
+                b0, b1 = b0[img_subsample], b1[img_subsample]
             else:
-                a0,a1 = a0[img_subsample,:], a1[img_subsample,:]
-                b0,b1 = b0[img_subsample,:], b1[img_subsample,:]
+                a0, a1 = a0[img_subsample, :], a1[img_subsample, :]
+                b0, b1 = b0[img_subsample, :], b1[img_subsample, :]
         ind = np.isfinite(a0) & np.isfinite(a1) & np.isfinite(b0) & np.isfinite(b1)
         a0 = np.squeeze(a0[ind])
         a1 = np.squeeze(a1[ind])
         b0 = np.squeeze(b0[ind])
         b1 = np.squeeze(b1[ind])
-
-        ic_a = nnan_consistency(a0,a1, corrtype)
-        ic_b = nnan_consistency(b0,b1, corrtype)
+        ic_a = nnan_consistency(a0, a1, corrtype)
+        ic_b = nnan_consistency(b0, b1, corrtype)
         out['IC_a'].append(ic_a)
         out['IC_b'].append(ic_b)
-
-        rho_tmp = [];
-        rho_tmp.append(nnan_consistency(a0,b0, corrtype))
-        rho_tmp.append(nnan_consistency(a1,b0, corrtype))
-        rho_tmp.append(nnan_consistency(a0,b1, corrtype))
-        rho_tmp.append(nnan_consistency(a1,b1, corrtype))
-        
+        rho_tmp = []
+        rho_tmp.append(nnan_consistency(a0, b0, corrtype))
+        rho_tmp.append(nnan_consistency(a1, b0, corrtype))
+        rho_tmp.append(nnan_consistency(a0, b1, corrtype))
+        rho_tmp.append(nnan_consistency(a1, b1, corrtype))        
         out['rho'].append(np.mean(rho_tmp))
-        out['rho_n'].append( np.mean(rho_tmp) / ((ic_a*ic_b)**0.5) )
-        out['rho_n_sq'].append( np.mean(rho_tmp)**2 / ((ic_a*ic_b)) )
+        out['rho_n'].append(np.mean(rho_tmp) / ((ic_a*ic_b)**0.5))
+        out['rho_n_sq'].append(np.mean(rho_tmp)**2 / ((ic_a*ic_b)))
 
     return out
-
-
+    

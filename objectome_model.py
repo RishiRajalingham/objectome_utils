@@ -9,7 +9,7 @@ import objectome_utils as obj
 
 OPT_DEFAULT = {
     'classifiertype':'svm',
-    'npc_train':50,
+    'npc_train':90,
     'npc_test':10,
     'n_splits':1,
     'train_q':{},
@@ -29,7 +29,7 @@ METRIC_KWARGS = {
         'model_kwargs': {'fnorm': True, 'snorm': False}},
     'rbfsvm': {'model_type': 'libSVM', 
         'model_kwargs': {'C': 50000, 'class_weight': 'auto',
-        'kernel': 'rbf'}},
+        'kernel': 'rbf', 'probability':True}},
     'knn': {'model_type': 'neighbors.KNeighborsClassifier', 
         'model_kwargs': {'n_neighbors':5}}
 }
@@ -82,6 +82,8 @@ def features2trials(features, meta, opt=OPT_DEFAULT, outfn=None):
     trials = tb.rowstack(all_trials)
     
     if outfn != None:
+        if opt['subsample'] == None:
+            opt['subsample'] = 0
         spec_suffix = '%s.f%d.t%d' % (opt['classifiertype'],opt['subsample'],opt['npc_train'])
         model_spec = opt['model_spec'] + spec_suffix
         outfn = outfn + model_spec + '.pkl'
@@ -137,6 +139,8 @@ def features2probs(features, meta, opt=OPT_DEFAULT, outfn=None):
     trials = tb.rowstack(all_trials)
     
     if outfn != None:
+    	if opt['subsample'] == None:
+    		opt['subsample'] = 0
         spec_suffix = 'prob_%s.f%d.t%d' % (opt['classifiertype'],opt['subsample'],opt['npc_train'])
         model_spec = opt['model_spec'] + spec_suffix
         outfn = outfn + model_spec + '.pkl'
@@ -144,14 +148,13 @@ def features2probs(features, meta, opt=OPT_DEFAULT, outfn=None):
         print 'Saved ' + outfn + ' \n ' + str(trials.shape[0])
     return trials
 
-def run_important_ones(models=None, imgset='im240'):
+def run_important_ones(models=None, imgset='im240', prob_estimate=True):
     datapath = obj.dicarlolab_homepath + 'monkey_objectome/behavioral_benchmark/data/'
     feature_path = obj.dicarlolab_homepath + 'stimuli/objectome24s100/features/'
     trial_path = datapath + 'trials/'
     if models == None:
-        # models  = ['ALEXNET_fc6', 'ALEXNET_fc7','ALEXNET_fc8','VGG_fc6','VGG_fc7','VGG_fc8','RESNET101_conv5',
-        #     'GOOGLENET_pool5','GOOGLENETv3_pool5']
-        models  = ['GOOGLENETv3_pool5_synth34000', 'GOOGLENETv3_pool5_retina']
+        models  = ['ALEXNET_fc6', 'ALEXNET_fc7','ALEXNET_fc8','VGG_fc6','VGG_fc7','VGG_fc8','RESNET101_conv5',
+            'GOOGLENET_pool5','GOOGLENETv3_pool5','GOOGLENETv3_pool5_synth34000', 'GOOGLENETv3_pool5_retina']
 
     meta = obj.objectome24_meta()
     uobj = list(set(meta['obj']))
@@ -165,9 +168,10 @@ def run_important_ones(models=None, imgset='im240'):
         feature_fn = feature_path + mod + '.npy'
         features = np.load(feature_fn)
 
-        for classifiertype in ['svm']:#, 'mcc', 'knn']:
-            for subsample in [1000]:# [100,500,1000]:
-                for npc_train in [10]:#[10,30,50]:
+        for classifiertype in ['svm'
+        ]:#, 'mcc', 'knn']:
+            for subsample in [None]:#[100,500,1000]:
+                for npc_train in [90]:#[10,30,50]:
                     opt = copy.deepcopy(OPT_DEFAULT)
                     opt['classifiertype'] = classifiertype
                     opt['subsample'] = subsample
@@ -182,8 +186,10 @@ def run_important_ones(models=None, imgset='im240'):
 
                     outpath = trial_path + imgset + '/'
                     opt['model_spec'] = mod
-                    
-                    trials = features2probs(features, meta, opt=opt, outfn=outpath)
+                    if prob_estimate:
+                        trials = features2probs(features, meta, opt=opt, outfn=outpath)
+                    else:
+                        trials = features2trials(features, meta, opt=opt, outfn=outpath)
     return
 
 

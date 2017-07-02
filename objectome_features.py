@@ -1,8 +1,8 @@
 import scipy.io as io
 import cPickle as pk
 import numpy as np
-import skdata.larray as larray
-from dldata.stimulus_sets.hvm import ImgLoaderResizer
+# import skdata.larray as larray
+# from dldata.stimulus_sets.hvm import ImgLoaderResizer
 
 
 STIMPATH_HVM = '/mindhive/dicarlolab/u/rishir/stimuli/hvm/'
@@ -14,68 +14,68 @@ STIMPATH_OBJRET = '/mindhive/dicarlolab/u/rishir/stimuli/objectome64s100ret/'
 IMGPATH_DEFAULT = STIMPATH_OBJ
 
 
-def getPixelFeatures(objects_oi, normalize_on=False, IMGPATH=IMGPATH_DEFAULT):
-    """ compute pixel features on images of objects of interest """
-    meta = pk.load(open(IMGPATH + 'metadata.pkl', 'r'))
+# def getPixelFeatures(objects_oi, normalize_on=False, IMGPATH=IMGPATH_DEFAULT):
+#     """ compute pixel features on images of objects of interest """
+#     meta = pk.load(open(IMGPATH + 'metadata.pkl', 'r'))
 
-    """ fix obj field"""
-    if len(meta[0]['obj']) == 1:
-        for i,m in enumerate(meta):
-            meta[i]['obj'] = m['obj'][0]
+#     """ fix obj field"""
+#     if len(meta[0]['obj']) == 1:
+#         for i,m in enumerate(meta):
+#             meta[i]['obj'] = m['obj'][0]
 
-    meta_ind = []
-    image_paths = []
-    for i, m in enumerate(meta):
-        if m['obj'] in objects_oi:
-            meta_ind.append(i)
-            image_paths +=  [IMGPATH + 'images/' + m['id'] + '.png']
+#     meta_ind = []
+#     image_paths = []
+#     for i, m in enumerate(meta):
+#         if m['obj'] in objects_oi:
+#             meta_ind.append(i)
+#             image_paths +=  [IMGPATH + 'images/' + m['id'] + '.png']
 
-    imgs = larray.lmap(ImgLoaderResizer(inshape=(256,256), shape=(256,256), dtype='float32',normalize=normalize_on, mask=None), image_paths)
-    imgs = np.array(imgs)
-    ts = imgs.shape
-    print ts
-    pixels_features = imgs.reshape(ts[0], ts[1]*ts[2])
-    pixel_meta = meta[meta_ind]
-    return pixels_features, pixel_meta
+#     imgs = larray.lmap(ImgLoaderResizer(inshape=(256,256), shape=(256,256), dtype='float32',normalize=normalize_on, mask=None), image_paths)
+#     imgs = np.array(imgs)
+#     ts = imgs.shape
+#     print ts
+#     pixels_features = imgs.reshape(ts[0], ts[1]*ts[2])
+#     pixel_meta = meta[meta_ind]
+#     return pixels_features, pixel_meta
 
-def getPixelFeatures_localized(objects_oi, IMGPATH=IMGPATH_DEFAULT):
-    """ compute pixel features on images of objects of interest - localized to window based on metadata """
-    meta = pk.load(open(IMGPATH + 'metadata.pkl', 'r'))
-    meta_ind, image_paths, pixels_features = [], [], []
-    win = 5
-    img_size = 256
+# def getPixelFeatures_localized(objects_oi, IMGPATH=IMGPATH_DEFAULT):
+#     """ compute pixel features on images of objects of interest - localized to window based on metadata """
+#     meta = pk.load(open(IMGPATH + 'metadata.pkl', 'r'))
+#     meta_ind, image_paths, pixels_features = [], [], []
+#     win = 5
+#     img_size = 256
 
-    for i, m in enumerate(meta):
-        if m['obj'] in objects_oi:
-            ii = int(-m['tz']*img_size/2 + img_size/2)
-            jj = int(m['ty']*img_size/2 + img_size/2)
+#     for i, m in enumerate(meta):
+#         if m['obj'] in objects_oi:
+#             ii = int(-m['tz']*img_size/2 + img_size/2)
+#             jj = int(m['ty']*img_size/2 + img_size/2)
 
-            meta_ind.append(i)
-            fn =   [IMGPATH + 'images/' + m['obj'] + '_' + m['id'] + '.png']
-            img = larray.lmap(ImgLoaderResizer(inshape=(1024,1024), shape=(img_size,img_size), dtype='float32',normalize=False, mask=None), fn)
-            img = np.squeeze(np.array(img))
+#             meta_ind.append(i)
+#             fn =   [IMGPATH + 'images/' + m['obj'] + '_' + m['id'] + '.png']
+#             img = larray.lmap(ImgLoaderResizer(inshape=(1024,1024), shape=(img_size,img_size), dtype='float32',normalize=False, mask=None), fn)
+#             img = np.squeeze(np.array(img))
             
-            # if image section goes beyond border, add a zero padding
-            pad = np.zeros(img.shape)
-            if (ii-win < 0):
-                img = np.concatenate((pad, img), axis=0)
-                ii += img_size
-            elif (ii+win) >= img_size:
-                img = np.concatenate((img, pad), axis=0)
-            pad = np.zeros(img.shape)
-            if (jj-win < 0):
-                img = np.concatenate((pad, img), axis=1)
-                jj += img_size
-            elif (jj+win >= img_size):
-                img = np.concatenate((img, pad), axis=1)
+#             # if image section goes beyond border, add a zero padding
+#             pad = np.zeros(img.shape)
+#             if (ii-win < 0):
+#                 img = np.concatenate((pad, img), axis=0)
+#                 ii += img_size
+#             elif (ii+win) >= img_size:
+#                 img = np.concatenate((img, pad), axis=0)
+#             pad = np.zeros(img.shape)
+#             if (jj-win < 0):
+#                 img = np.concatenate((pad, img), axis=1)
+#                 jj += img_size
+#             elif (jj+win >= img_size):
+#                 img = np.concatenate((img, pad), axis=1)
 
-            tmp = img[ii-win:ii+win, jj-win:jj+win].flatten()
-            pixels_features.append(tmp)
-            image_paths += fn
+#             tmp = img[ii-win:ii+win, jj-win:jj+win].flatten()
+#             pixels_features.append(tmp)
+#             image_paths += fn
 
-    pixels_features = np.array(pixels_features)
-    pixel_meta = meta[meta_ind]
-    return pixels_features, pixel_meta
+#     pixels_features = np.array(pixels_features)
+#     pixel_meta = meta[meta_ind]
+#     return pixels_features, pixel_meta
 
 def getV1Features(objects_oi, IMGPATH=IMGPATH_DEFAULT):
     """ load v1 features on images of objects of interest """

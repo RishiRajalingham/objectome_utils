@@ -9,7 +9,6 @@ import datetime
 import scipy.io as io
 import cPickle as pk
 import numpy as np
-import skdata.larray as larray
 import tabular as tb
 import random
 
