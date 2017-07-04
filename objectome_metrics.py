@@ -263,105 +263,12 @@ Methods for measuring consistency of output metric
 def get_mean_behavior(b1, metricn):
     return np.squeeze(np.nanmean(np.nanmean(b1[metricn], axis=1), axis=0))
 
-def get_mean_behavior_v2(b1, metricn):
-    return rec[metricn]['all']
-
 def nnan_consistency(A,B, corrtype='pearson'):
     ind = np.isfinite(A) & np.isfinite(B)
     if corrtype == 'pearson':
         return pearsonr(A[ind], B[ind])[0]
     elif corrtype == 'spearman':
         return spearmanr(A[ind], B[ind])[0]
-
-def pairwise_consistency_v2(A,B, metricn='I1_dprime_z', corrtype='pearson', img_subsample=None):
-
-    out_1 = {'IC_a':[], 'IC_b':[], 'rho':[], 'rho_n':[], 'rho_n_sq':[]} #use prediction formula 
-    out_2 = {'IC_a':[], 'IC_b':[], 'rho':[], 'rho_n':[], 'rho_n_sq':[]} #use split halves for all correlations
-
-    # raw correlation of metric estimated from all data
-    A_, B_ = A[metricn]['all'], B[metricn]['all']
-    if img_subsample is not None:
-        if A_.ndim == 1:
-            A_, B_ = A_[img_subsample], B_[img_subsample]
-        else:
-            A_, B_ = A_[img_subsample, :], B_[img_subsample, :]
-    rho = nnan_consistency(A_, B_, corrtype)
-    out_1['rho'] = rho
-
-    # internal consistency estimated from split halves
-    A_s, B_s = A[metricn]['splits'], B[metricn]['splits']
-    niter = min(len(A_s), len(B_s))
-    for i in range(niter):
-        a0, a1 = A_s[i][0], A_s[i][1]
-        b0, b1 = B_s[i][0], B_s[i][1]
-        if img_subsample is not None:
-            if a0.ndim == 1:
-                a0, a1 = a0[img_subsample], a1[img_subsample]
-                b0, b1 = b0[img_subsample], b1[img_subsample]
-            else:
-                a0, a1 = a0[img_subsample, :], a1[img_subsample, :]
-                b0, b1 = b0[img_subsample, :], b1[img_subsample, :]
-        ic_a_2 = nnan_consistency(a0, a1, corrtype)
-        ic_b_2 = nnan_consistency(b0, b1, corrtype)
-        rho_tmp = []
-        rho_tmp.append(nnan_consistency(a0,b0, corrtype))
-        rho_tmp.append(nnan_consistency(a1,b0, corrtype))
-        rho_tmp.append(nnan_consistency(a0,b1, corrtype))
-        rho_tmp.append(nnan_consistency(a1,b1, corrtype))
-        rho_2 = np.nanmean(rho_tmp)
-
-        out_2['rho'].append(rho_2)
-        out_2['IC_a'].append(ic_a_2)
-        out_2['IC_b'].append(ic_b_2)
-
-        # spearman brown correction
-        ic_a_1 = 2*ic_a_2 / (1+ic_a_2)
-        ic_b_1 = 2*ic_b_2 / (1+ic_b_2)
-        out_1['IC_a'].append(ic_a_1)
-        out_1['IC_b'].append(ic_b_1)
-
-        out_1['rho_n'].append(rho / ((ic_a_1*ic_b_1)**0.5))
-        out_2['rho_n'].append(rho_2 / ((ic_a_2*ic_b_2)**0.5))
-
-        out_1['rho_n_sq'].append((rho**2) / ((ic_a_1*ic_b_1)))
-        out_2['rho_n_sq'].append((rho_2**2) / ((ic_a_2*ic_b_2)))
-
-    return out_1, out_2
-
-def pairwise_consistency_perobj(A,B, metricn, uobj, corrtype='pearson'):
-    niter = min(len(A), len(B))
-    out = {'IC_a':[], 'IC_b':[], 'rho':[], 'rho_n':[], 'rho_n_sq':[]}
-    for i in range(niter):
-        IC_a, IC_b, RHO, RHO_N, RHO_N_SQ = [],[],[],[],[]
-        for obj_oi in uobj:
-            win = meta['obj'] == obj_oi
-            a0,a1 = A[metricn][i][0][win], A[metricn][i][1][win]
-            b0,b1 = B[metricn][i][0][win], B[metricn][i][1][win]
-
-            ic_a = nnan_consistency(a0,a1, corrtype)
-            ic_b = nnan_consistency(b0,b1, corrtype)
-            rho_tmp = [];
-            rho_tmp.append(nnan_consistency(a0,b0, corrtype))
-            rho_tmp.append(nnan_consistency(a1,b0, corrtype))
-            rho_tmp.append(nnan_consistency(a0,b1, corrtype))
-            rho_tmp.append(nnan_consistency(a1,b1, corrtype))
-
-            rho = np.mean(rho_tmp)
-            rho_n = np.mean(rho_tmp) / ((ic_a*ic_b)**0.5)
-            rho_n_sq = np.mean(rho_tmp)**2 / ((ic_a*ic_b))
-                                     
-            IC_a.append(ic_a)
-            IC_b.append(ic_b)
-            RHO.append(rho)
-            RHO_N.append(rho_n)
-            RHO_N_SQ.append(rho_n_sq)
-                                     
-        out['IC_a'].append(IC_a)
-        out['IC_b'].append(IC_b)
-        out['rho'].append(RHO)
-        out['rho_n'].append(RHO_N)
-        out['rho_n_sq'].append(RHO_N_SQ)
-    return out
 
 def pairwise_consistency(A,B, metricn='I1_dprime_z', corrtype='pearson', img_subsample=None):
     niter = min(len(A[metricn]), len(B[metricn]))
