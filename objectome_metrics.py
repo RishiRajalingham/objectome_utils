@@ -153,9 +153,9 @@ def get_metric_from_trials_base(trials, meta, metric_spec='all'):
     # precompute a bunch of logicals
     summary = [{'sam':[],'dist':[],'choice':[],'imgind':[]} for i in range(nobjs)]
     for i,OI in enumerate(uobjs):
-        summary[i]['sam'] = (trials['sample_obj'] == OI)
-        summary[i]['dist'] = (trials['dist_obj'] == OI)
-        summary[i]['choice'] = (trials['choice'] == OI)
+        summary[i]['sam'] = np.array(trials['sample_obj'] == OI)
+        summary[i]['dist'] = np.array(trials['dist_obj'] == OI)
+        summary[i]['choice'] = np.array(trials['choice'] == OI)
         summary[i]['imgind'] = np.array([uimgs.index(m['id']) for m in meta if (m['obj'] == OI) ])
 
     for i in range(nobjs):   
@@ -163,12 +163,19 @@ def get_metric_from_trials_base(trials, meta, metric_spec='all'):
         for j in range(i+1, nobjs):
             img_ind_j = summary[j]['imgind']
 
+            Si_Dj = np.logical_and(summary[i]['sam'], summary[j]['dist'])
+            Si_Dj_i = np.logical_and(Si_Dj, summary[i]['choice'])
+            Si_Dj_j = np.logical_and(Si_Dj, summary[j]['choice'])
+
+            Sj_Di = np.logical_and(summary[j]['sam'], summary[i]['dist'])
+            Sj_Di_i = np.logical_and(Sj_Di, summary[i]['choice'])
+            Sj_Di_j = np.logical_and(Sj_Di, summary[j]['choice'])
+
             cont_table = np.zeros((2,2))
-            # read this next line as trials with: sample I, distracter J, choice I.
-            cont_table[0,0] = np.sum(summary[i]['sam'] & summary[j]['dist'] & summary[i]['choice'])
-            cont_table[0,1] = np.sum(summary[i]['sam'] & summary[j]['dist'] & summary[j]['choice'])
-            cont_table[1,0] = np.sum(summary[j]['sam'] & summary[i]['dist'] & summary[i]['choice'])
-            cont_table[1,1] = np.sum(summary[j]['sam'] & summary[i]['dist'] & summary[j]['choice'])
+            cont_table[0,0] = np.sum(Si_Dj_i)
+            cont_table[0,1] = np.sum(Si_Dj_j)
+            cont_table[1,0] = np.sum(Sj_Di_i)
+            cont_table[1,1] = np.sum(Sj_Di_j)
             dp,ba,hr,cr = dprime_from2x2(cont_table)
             rec['O2_dprime'][i,j] = dp
             rec['O2_accuracy'][i,j] = ba
@@ -187,17 +194,26 @@ def get_metric_from_trials_base(trials, meta, metric_spec='all'):
             continue
 
         for j in range(nimgs):
-            t_j = trials['id'] == uimgs[j] 
+            t_j = np.array(trials['id'] == uimgs[j])
             OJ = meta[meta['id'] == uimgs[j]]['obj']
             j_ = uobjs.index(OJ)
             if j_ == i:
                 continue
             cont_table = np.zeros((2,2))
+
+            Sj_Di = np.logical_and(t_j, summary[i]['dist'])
+            Sj_Di_j = np.logical_and(Sj_Di, summary[j_]['choice'])
+            Sj_Di_i = np.logical_and(Sj_Di, summary[i]['choice'])
+
+            Si_Dj = np.logical_and(summary[i]['sam'], summary[j_]['dist'])
+            Si_Dj_j = np.logical_and(Si_Dj, summary[j_]['choice'])
+            Si_Dj_i = np.logical_and(Si_Dj, summary[i]['choice'])
+
             # read this next line as trials with: sample j, distracter I, choice J.
-            cont_table[0,0] = np.sum(t_j & summary[i]['dist'] & summary[j_]['choice'])
-            cont_table[0,1] = np.sum(t_j & summary[i]['dist'] & summary[i]['choice'])
-            cont_table[1,0] = np.sum(summary[i]['sam'] & summary[j_]['dist'] & summary[j_]['choice'])
-            cont_table[1,1] = np.sum(summary[i]['sam'] & summary[j_]['dist'] & summary[i]['choice'])
+            cont_table[0,0] = np.sum(Sj_Di_j)
+            cont_table[0,1] = np.sum(Sj_Di_i)
+            cont_table[1,0] = np.sum(Si_Dj_j)
+            cont_table[1,1] = np.sum(Si_Dj_i)
 
             dp,ba,hr,cr = dprime_from2x2(cont_table)
             rec['I2_dprime'][j,i] = dp
@@ -218,14 +234,14 @@ def get_metric_from_trials_base(trials, meta, metric_spec='all'):
 
     return rec
 
-def get_metric_base(trials, meta, prob_estimate=False, metric_spec='all'):
-    if prob_estimate:
-        rec = get_metric_from_probs_base(trials, meta, metric_spec=metric_spec)
+def get_metric_base(trials, meta, metric_spec='all'):
+    if 'choice' in list(trials.dtype.names):
+        return get_metric_from_trials_base(trials, meta, metric_spec=metric_spec)
     else:
-        rec = get_metric_from_trials_base(trials, meta, metric_spec=metric_spec)
-    return rec
+        return get_metric_from_probs_base(trials, meta, metric_spec=metric_spec)
+        
 
-def compute_behavioral_metrics(trials, meta, niter, prob_estimate=False, metric_spec='all', noise_model='trial_samples'):
+def compute_behavioral_metrics(trials, meta, niter, metric_spec='all', noise_model='trial_samples'):
     metrics = [
         'O2_dprime', 'O2_accuracy', 'O2_hitrate', 
         'I2_dprime', 'I2_accuracy', 'I2_hitrate', 
@@ -236,7 +252,7 @@ def compute_behavioral_metrics(trials, meta, niter, prob_estimate=False, metric_
 
     if noise_model == None:
         # run on all trials just once without any sampling
-        rec_all = get_metric_base(trials, meta, prob_estimate=prob_estimate, metric_spec=metric_spec)
+        rec_all = get_metric_base(trials, meta, metric_spec=metric_spec)
 
     rec = {k: [] for k in metrics}
     
@@ -250,8 +266,8 @@ def compute_behavioral_metrics(trials, meta, niter, prob_estimate=False, metric_
             random.shuffle(tr)
             tr1 = tr[:int(len(tr)/2)]
             tr2 = tr[int(len(tr)/2):]
-            rec1 = get_metric_base(trials[tr1], meta, prob_estimate=prob_estimate, metric_spec=metric_spec)
-            rec2 = get_metric_base(trials[tr2], meta, prob_estimate=prob_estimate, metric_spec=metric_spec)
+            rec1 = get_metric_base(trials[tr1], meta, metric_spec=metric_spec)
+            rec2 = get_metric_base(trials[tr2], meta, metric_spec=metric_spec)
         for fn in metrics:
             rec[fn].append([rec1[fn], rec2[fn]])
     return rec
@@ -263,14 +279,23 @@ Methods for measuring consistency of output metric
 def get_mean_behavior(b1, metricn):
     return np.squeeze(np.nanmean(np.nanmean(b1[metricn], axis=1), axis=0))
 
-def nnan_consistency(A,B, corrtype='pearson'):
+def nnan_consistency(A,B, corrtype='pearson', ignore_vals=None):
     ind = np.isfinite(A) & np.isfinite(B)
+    A,B = A[ind], B[ind]
+    if ignore_vals is not None:
+        A2,B2 = [],[]
+        for a,b in zip(A,B):
+            if not((a in ignore_vals) or (b in ignore_vals)):
+                A2.append(a)
+                B2.append(b)
+        A = np.array(A2)
+        B = np.array(B2)
     if corrtype == 'pearson':
-        return pearsonr(A[ind], B[ind])[0]
+        return pearsonr(A, B)[0]
     elif corrtype == 'spearman':
-        return spearmanr(A[ind], B[ind])[0]
+        return spearmanr(A, B)[0]
 
-def pairwise_consistency(A,B, metricn='I1_dprime_z', corrtype='pearson', img_subsample=None):
+def pairwise_consistency(A,B, metricn='I1_dprime_z', corrtype='pearson', img_subsample=None, ignore_vals=None):
     niter = min(len(A[metricn]), len(B[metricn]))
     out = {'IC_a':[], 'IC_b':[], 'rho':[], 'rho_n':[], 'rho_n_sq':[]}
     for i in range(niter):
@@ -285,19 +310,20 @@ def pairwise_consistency(A,B, metricn='I1_dprime_z', corrtype='pearson', img_sub
                 a0, a1 = a0[img_subsample, :], a1[img_subsample, :]
                 b0, b1 = b0[img_subsample, :], b1[img_subsample, :]
         ind = np.isfinite(a0) & np.isfinite(a1) & np.isfinite(b0) & np.isfinite(b1)
+
         a0 = np.squeeze(a0[ind])
         a1 = np.squeeze(a1[ind])
         b0 = np.squeeze(b0[ind])
         b1 = np.squeeze(b1[ind])
-        ic_a = nnan_consistency(a0, a1, corrtype)
-        ic_b = nnan_consistency(b0, b1, corrtype)
+        ic_a = nnan_consistency(a0, a1, corrtype=corrtype, ignore_vals=ignore_vals)
+        ic_b = nnan_consistency(b0, b1, corrtype=corrtype, ignore_vals=ignore_vals)
         out['IC_a'].append(ic_a)
         out['IC_b'].append(ic_b)
         rho_tmp = []
-        rho_tmp.append(nnan_consistency(a0, b0, corrtype))
-        rho_tmp.append(nnan_consistency(a1, b0, corrtype))
-        rho_tmp.append(nnan_consistency(a0, b1, corrtype))
-        rho_tmp.append(nnan_consistency(a1, b1, corrtype))        
+        rho_tmp.append(nnan_consistency(a0, b0, corrtype=corrtype, ignore_vals=ignore_vals))
+        rho_tmp.append(nnan_consistency(a1, b0, corrtype=corrtype, ignore_vals=ignore_vals))
+        rho_tmp.append(nnan_consistency(a0, b1, corrtype=corrtype, ignore_vals=ignore_vals))
+        rho_tmp.append(nnan_consistency(a1, b1, corrtype=corrtype, ignore_vals=ignore_vals))        
         out['rho'].append(np.mean(rho_tmp))
         out['rho_n'].append(np.mean(rho_tmp) / ((ic_a*ic_b)**0.5))
         out['rho_n_sq'].append(np.mean(rho_tmp)**2 / ((ic_a*ic_b)))

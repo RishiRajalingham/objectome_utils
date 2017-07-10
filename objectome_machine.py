@@ -50,7 +50,7 @@ def getBinaryTasks_pair(meta, object_pairs_oi):
 
 def getBinaryTasks_all(meta, objects_oi=None):
     """ Returns binary tasks for all pairs of objects in objects_oi. """
-    if objects_oi == None:
+    if objects_oi is None:
         objects_oi = np.unique(meta['obj'])
         objects_oi = [i for o in objects_oi for i in o]
     nc_objs = len(objects_oi)
@@ -69,26 +69,7 @@ def getBinaryTasks(meta, objects_oi):
     else:
         return getBinaryTasks_pair(meta, objects_oi)
 
-""" ********** Feature manipulations ********** """
-def sampleFeatures(features, noise_model=None, subsample=None):
-    if noise_model == None:
-        feature_sample = features
-    elif noise_model == 'poisson':
-        noise_mask = np.sign(features) * np.random.poisson(features)
-        feature_sample = features + noise_mask
-    elif noise_model == 'rep':
-        fsize = features.shape
-        assert len(fsize) == 3 #image x rep x site
-        feature_sample = np.zeros((fsize[0],fsize[2]))
-        inds = np.random.randint(0,fsize[1],fsize[0])
-        for i in range(fsize[1]):
-            feature_sample[inds == i,:] = features[inds == i,i,:]
 
-    if subsample != None:
-        nunits = range(feature_sample.shape[1])
-        np.random.shuffle(nunits)
-        feature_sample = feature_sample[:,nunits[:subsample]]
-    return feature_sample
         
 """ ********** Classifier functions ********** """
 

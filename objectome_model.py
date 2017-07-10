@@ -5,7 +5,7 @@ import cPickle as pk
 import tabular as tb
 import dldata.metrics.utils as utils
 import objectome_utils as obj
-
+from sklearn.decomposition import PCA
 
 OPT_DEFAULT = {
     'classifiertype':'svm',
@@ -31,10 +31,42 @@ METRIC_KWARGS = {
         'model_kwargs': {'C': 50000, 'class_weight': 'auto',
         'kernel': 'rbf', 'probability':True}},
     'knn': {'model_type': 'neighbors.KNeighborsClassifier', 
-        'model_kwargs': {'n_neighbors':5}}
+        'model_kwargs': {'n_neighbors':5}},
+    'softmax': {'model_type': 'LRL'}
+
 }
 
-        
+
+""" ********** Feature manipulations ********** """
+def sample_features(features, noise_model=None, subsample=None, seed=None):
+    if seed is not None:
+        np.random.seed(seed)
+    if noise_model == None:
+        feature_sample = features
+    elif noise_model == 'poisson':
+        noise_mask = np.sign(features) * np.random.poisson(features)
+        feature_sample = features + noise_mask
+    elif noise_model == 'rep':
+        fsize = features.shape
+        assert len(fsize) == 3 #image x rep x site
+        feature_sample = np.zeros((fsize[0],fsize[2]))
+        inds = np.random.randint(0,fsize[1],fsize[0])
+        for i in range(fsize[1]):
+            feature_sample[inds == i,:] = features[inds == i,i,:]
+
+    if subsample != None:
+        nunits = range(feature_sample.shape[1])
+        np.random.shuffle(nunits)
+        feature_sample = feature_sample[:,nunits[:subsample]]
+    return feature_sample
+
+def compress_features(features, pca_thres=0.99):
+    pca = PCA()
+    features2 = pca.fit_transform(features)
+    latent = np.cumsum(pca.explained_variance_ratio_)
+    nfeat = np.nonzero(latent > pca_thres)[0][0]
+    return features2[:,:nfeat]
+
 """ ********** Classifier functions ********** """
 
 def features2trials_pertask(features_task, meta_task, opt):
@@ -74,7 +106,7 @@ def features2trials(features, meta, opt=OPT_DEFAULT, outfn=None):
     tasks = obj.getBinaryTasks(meta, np.array(opt['objects_oi']))
     all_trials = ()
     for isample in range(opt['nsamples_noisemodel']):
-        features_sample = obj.sampleFeatures(features, opt['noise_model'], opt['subsample'])
+        features_sample = obj.sample_features(features, opt['noise_model'], opt['subsample'])
         for task in tasks:
             task_ind = np.squeeze(task)
             trials = features2trials_pertask(features_sample[task_ind,:], meta[task_ind], opt)
@@ -131,7 +163,7 @@ def features2probs(features, meta, opt=OPT_DEFAULT, outfn=None):
     tasks = obj.getBinaryTasks(meta, np.array(opt['objects_oi']))
     all_trials = ()
     for isample in range(opt['nsamples_noisemodel']):
-        features_sample = obj.sampleFeatures(features, opt['noise_model'], opt['subsample'])
+        features_sample = obj.sample_features(features, opt['noise_model'], opt['subsample'])
         for task in tasks:
             task_ind = np.squeeze(task)
             trials = features2probs_pertask(features_sample[task_ind,:], meta[task_ind], opt)
@@ -167,9 +199,10 @@ def run_important_ones(models=None, imgset='im240', prob_estimate=True):
     for mod in models:
         feature_fn = feature_path + mod + '.npy'
         features = np.load(feature_fn)
+        if features.shape[1] > 5000:
+            features = compress_features(features)
 
-        for classifiertype in ['svm'
-        ]:#, 'mcc', 'knn']:
+        for classifiertype in ['svm', 'softmax']:#, 'mcc', 'knn']:
             for subsample in [None]:#[100,500,1000]:
                 for npc_train in [90]:#[10,30,50]:
                     opt = copy.deepcopy(OPT_DEFAULT)
@@ -183,6 +216,9 @@ def run_important_ones(models=None, imgset='im240', prob_estimate=True):
                     elif imgset == 'im2400':
                         opt['train_q'] = {}
                         opt['test_q'] = {}
+                        opt['n_splits'] = 50
+                        opt['npc_train'] = 50
+                        opt['npc_test'] = 50
 
                     outpath = trial_path + imgset + '/'
                     opt['model_spec'] = mod

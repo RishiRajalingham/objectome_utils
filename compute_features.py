@@ -6,6 +6,7 @@ import os
 # import matplotlib.pyplot as plt
 import scipy.io as io
 import random
+import glob
 
 """ This is a slightly edited version of Shay's OM script. - rishir"""
 
@@ -141,11 +142,14 @@ def translate_images(images):
         images_shifted.append(im)
     return images_shifted
 
-def run_model(stimpath, cnn_oi='VGG_S'):
-
-    # Get image files
+def run_model(stimpath, cnn_oi='VGG_S', run_token=False):
     meta = pk.load(open(stimpath + 'metadata.pkl'))
-    filelist = [stimpath + 'images/' + m['id'] + '.png' for m in meta]
+    if run_token:
+        filelist = glob.glob(stimpath + 'labels/*.png')
+    else:
+    # Get image files
+        filelist = [stimpath + 'images/' + m['id'] + '.png' for m in meta]
+    
     filelist = filelist[:MAXNSTIM]
     nstim = len(filelist)
     print("There are "+str(nstim)+ " files")
@@ -217,6 +221,8 @@ def run_one(stimpath, cnn_oi):
     features_perlayer, meta, output_path = run_model(stimpath=stimpath, cnn_oi=cnn_oi)
     save_features(features_perlayer, meta, cnn_oi, output_path, repindex=None)
 
+def run_token(stimpath, cnn_oi):
+    features_perlayer, meta, output_path = run_model(stimpath=stimpath, cnn_oi=cnn_oi)
 
 # run_one(stimpath=STIMPATH_OBJ_ALPHA, cnn_oi='AlexNet')
 run_one(stimpath=STIMPATH_OBJ_ALPHA, cnn_oi='GoogLeNet')

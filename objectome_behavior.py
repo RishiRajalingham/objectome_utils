@@ -118,7 +118,7 @@ def get_monkeyturk_data(dataset='objectome24'):
 
     col_data_seg = {}
     trial_records = []
-    subjs = ['Manto', 'Zico', 'Picasso', 'Nano', 'Bento']#, 'Magneto', 'Pablo']
+    subjs = ['Manto', 'Zico', 'Picasso', 'Nano', 'Bento', 'Magneto', 'Pablo']
     for sub in subjs:
         x = datmat['allData'][sub][0,0]
         for xi in range(x.shape[0]):
