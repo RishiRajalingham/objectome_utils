@@ -53,13 +53,20 @@ def euler2q(rx0, ry0, rz0):
     w = cx*cy*cz + sx*sy*sz
     return Q.Quat(Q.normalize([x, y, z, w])).q
 
-# compute quaternion difference
+
 def get_quat_diff(q, q0):
-    import Quaternion as Q
-    Qq = Q.Quat(q)
-    Qq0 = Q.Quat(q0)
-    Qdiff = Qq * Qq0.inv()
-    return np.arccos(np.abs(Qdiff.q))
+    q = np.array(q)
+    q0 = np.array(q0)
+    dot = np.sum(q*q0)
+    return np.arccos(abs(dot))
+
+# # compute quaternion difference
+# def get_quat_diff(q, q0):
+#     import Quaternion as Q
+#     Qq = Q.Quat(q)
+#     Qq0 = Q.Quat(q0)
+#     Qdiff = Qq * Qq0.inv()
+#     return np.arccos(np.abs(Qdiff.q))
 
 
 

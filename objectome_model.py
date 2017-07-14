@@ -6,6 +6,7 @@ import tabular as tb
 import dldata.metrics.utils as utils
 import objectome_utils as obj
 from sklearn.decomposition import PCA
+import os
 
 OPT_DEFAULT = {
     'classifiertype':'svm',
@@ -32,10 +33,9 @@ METRIC_KWARGS = {
         'kernel': 'rbf', 'probability':True}},
     'knn': {'model_type': 'neighbors.KNeighborsClassifier', 
         'model_kwargs': {'n_neighbors':5}},
-    'softmax': {'model_type': 'LRL'}
-
+    'softmax': {'model_type': 'LRL', 
+        'model_kwargs': {'multi_class':'multinomial'}}
 }
-
 
 """ ********** Feature manipulations ********** """
 def sample_features(features, noise_model=None, subsample=None, seed=None):
@@ -114,14 +114,49 @@ def features2trials(features, meta, opt=OPT_DEFAULT, outfn=None):
     trials = tb.rowstack(all_trials)
     
     if outfn != None:
-        if opt['subsample'] == None:
-            opt['subsample'] = 0
-        spec_suffix = '%s.f%d.t%d' % (opt['classifiertype'],opt['subsample'],opt['npc_train'])
-        model_spec = opt['model_spec'] + spec_suffix
-        outfn = outfn + model_spec + '.pkl'
         pk.dump(trials, open(outfn, 'wb'))
         print 'Saved ' + outfn + ' \n ' + str(trials.shape[0])
     return trials
+
+def features2probs_pertask_v2(features_task, meta_task, opt):
+    """ instead of trials, output for each image and distracter, a probability estimate of hit rate.
+        but don't use predict_proba, as this under-estimates the probability (cant be reliably estimated
+        from limited data, has cross validation folds inside the trainin data). instead use decision 
+        functions, renormalized to form probabilities (using a softmax). """
+    evalc = {'ctypes': [('dp_standard', 'dp_standard', {'kwargs': {'error': 'std'}})],
+         'labelfunc': 'obj',
+         'metric_kwargs': METRIC_KWARGS[opt['classifiertype']],
+         'metric_screen': 'classifier',
+         'npc_test': opt['npc_test'],
+         'npc_train': opt['npc_train'],
+         'npc_validate': 0,
+         'num_splits': opt['n_splits'],
+         'split_by': 'obj',
+         'split_seed': random.seed(),
+         'test_q': opt['test_q'],
+         'train_q': opt['train_q'],
+         'use_validation': False
+         }
+    rec = utils.compute_metric_base(features_task, meta_task, evalc, attach_models=True, return_splits=True)
+    trial_records = []
+    for s_i, s_res in enumerate(rec['split_results']):
+        mod = s_res['model']
+        split_ind = rec['splits'][0][s_i]['test']
+        imgid = meta_task[split_ind]['id']
+        proba = mod.predict_proba(features_task[split_ind,:])
+        true_label = meta_task[split_ind]['obj']
+        labelset = list(s_res['labelset'])
+        distr_label = [np.setdiff1d(labelset,np.array(pl))[0] for pl in meta_task[split_ind]['obj']]
+
+        for i, l in enumerate(true_label):
+            prob_a_ = proba[i,labelset.index(l)]
+            rec_curr = (true_label[i],) + (distr_label[i],) + (prob_a_,) + (imgid[i],) + ('ModelID',) + (opt['model_spec'],) 
+            trial_records.append(rec_curr)
+        
+    KW_NAMES = ['sample_obj', 'dist_obj', 'prob_choice', 'id', 'WorkerID', 'AssignmentID']
+    KW_FORMATS = ['|S40','|S40','|S40','|S40','|S40','|S40']
+    return tb.tabarray(records=trial_records, names=KW_NAMES, formats=KW_FORMATS)
+
 
 def features2probs_pertask(features_task, meta_task, opt):
     """ instead of trials, output for each image and distracter, a probability estimate of hit rate"""
@@ -171,11 +206,6 @@ def features2probs(features, meta, opt=OPT_DEFAULT, outfn=None):
     trials = tb.rowstack(all_trials)
     
     if outfn != None:
-    	if opt['subsample'] == None:
-    		opt['subsample'] = 0
-        spec_suffix = 'prob_%s.f%d.t%d' % (opt['classifiertype'],opt['subsample'],opt['npc_train'])
-        model_spec = opt['model_spec'] + spec_suffix
-        outfn = outfn + model_spec + '.pkl'
         pk.dump(trials, open(outfn, 'wb'))
         print 'Saved ' + outfn + ' \n ' + str(trials.shape[0])
     return trials
@@ -201,31 +231,42 @@ def run_important_ones(models=None, imgset='im240', prob_estimate=True):
         features = np.load(feature_fn)
         if features.shape[1] > 5000:
             features = compress_features(features)
-
+        print mod + ' : ' 
+        print features.shape
         for classifiertype in ['svm', 'softmax']:#, 'mcc', 'knn']:
-            for subsample in [None]:#[100,500,1000]:
-                for npc_train in [90]:#[10,30,50]:
-                    opt = copy.deepcopy(OPT_DEFAULT)
-                    opt['classifiertype'] = classifiertype
-                    opt['subsample'] = subsample
-                    opt['npc_train'] = npc_train
-                    
-                    if imgset == 'im240':
-                        opt['train_q'] = lambda x: (x['id'] not in set(imgids))
-                        opt['test_q'] = lambda x: (x['id'] in set(imgids))
-                    elif imgset == 'im2400':
-                        opt['train_q'] = {}
-                        opt['test_q'] = {}
-                        opt['n_splits'] = 50
-                        opt['npc_train'] = 50
-                        opt['npc_test'] = 50
+            opt = copy.deepcopy(OPT_DEFAULT)
+            opt['model_spec'] = mod
+            opt['classifiertype'] = classifiertype
+            opt['subsample'] = None
+            if imgset == 'im240':
+                opt['train_q'] = lambda x: (x['id'] not in set(imgids))
+                opt['test_q'] = lambda x: (x['id'] in set(imgids))
+                opt['npc_train'] = 90
+            elif imgset == 'im2400':
+                opt['train_q'] = {}
+                opt['test_q'] = {}
+                opt['n_splits'] = 50
+                opt['npc_train'] = 50
+                opt['npc_test'] = 50
 
-                    outpath = trial_path + imgset + '/'
-                    opt['model_spec'] = mod
-                    if prob_estimate:
-                        trials = features2probs(features, meta, opt=opt, outfn=outpath)
-                    else:
-                        trials = features2trials(features, meta, opt=opt, outfn=outpath)
+            outpath = trial_path + imgset + '/'
+            
+            if opt['subsample'] == None:
+                opt['subsample'] = 0    
+            if prob_estimate:
+                spec_suffix = 'prob_%s.f%d.t%d' % (opt['classifiertype'],opt['subsample'],opt['npc_train'])
+            else:
+                spec_suffix = '%s.f%d.t%d' % (opt['classifiertype'],opt['subsample'],opt['npc_train'])
+            model_spec = opt['model_spec'] + spec_suffix
+            outfn = outpath + model_spec + '.pkl'
+            if os.path.isfile(outfn):
+                print outfn + ' exists'
+                continue
+
+            if prob_estimate:
+                trials = features2probs(features, meta, opt=opt, outfn=outfn)
+            else:
+                trials = features2trials(features, meta, opt=opt, outfn=outfn)
     return
 
 
