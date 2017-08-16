@@ -1,4 +1,5 @@
 import random
+import copy
 import numpy as np
 from scipy.stats import norm, pearsonr, spearmanr
 from objectome_utils import nanzscore
@@ -13,10 +14,9 @@ import warnings
 warnings.filterwarnings("ignore",category=DeprecationWarning)
 warnings.filterwarnings("ignore",category=RuntimeWarning)
 
-def dprime_from2x2(C):
+def dprime_from2x2(C, maxVal=5):
     """ Input matrix C is essentially a 2x2 confusion matrix, 
-    rows and columsn: [A| !A], but !A can be a vector"""
-    maxVal = 5
+    rows and columsn: [A| !A], but !A can be a vector""" 
     hr_ = C[0,0] / (1.0*np.nansum(C[0,:]))
     fp_ = np.nansum(C[1:,0]) / (1.0*np.nansum(C[1:,:]))
     dp = norm.ppf(hr_,0,1) - norm.ppf(fp_,0,1)
@@ -124,6 +124,7 @@ def get_metric_augmented(trials, meta):
 
 def get_metric_from_probs_base(trials, meta, metric_spec='all'):
 
+    dprime_maxval = 10
     uobjs = list(set(meta['obj']))
     nobjs = len(uobjs)
     uimgs = list(meta['id'])
@@ -163,11 +164,15 @@ def get_metric_from_probs_base(trials, meta, metric_spec='all'):
             tj = summary[j]['sam'] & summary[i]['dist'] 
             xi = np.array(trials['prob_choice'][ti]).astype('double')
             xj = np.array(trials['prob_choice'][tj]).astype('double')
+
+            #xi = np.array([xx > 0.5 for xx in xi])
+            #xj = np.array([xx > 0.5 for xx in xj])
+
             cont_table[0,0] = np.nanmean(xi)
             cont_table[0,1] = 1 - np.nanmean(xi)
             cont_table[1,0] = 1 - np.nanmean(xj)
             cont_table[1,1] = np.nanmean(xj)
-            dp,ba,hr,cr = dprime_from2x2(cont_table)
+            dp,ba,hr,cr = dprime_from2x2(cont_table, maxVal=dprime_maxval)
             rec['O2_dprime'][i,j] = dp
             rec['O2_accuracy'][i,j] = ba
             rec['O2_hitrate'][i,j] = hr
@@ -203,7 +208,7 @@ def get_metric_from_probs_base(trials, meta, metric_spec='all'):
             cont_table[1,0] = 1 - np.nanmean(xj)
             cont_table[1,1] = np.nanmean(xj)
 
-            dp,ba,hr,cr = dprime_from2x2(cont_table)
+            dp,ba,hr,cr = dprime_from2x2(cont_table, maxVal=dprime_maxval)
             rec['I2_dprime'][j,i] = dp
             rec['I2_accuracy'][j,i] = ba
             rec['I2_hitrate'][j,i] = hr
@@ -335,6 +340,50 @@ def get_metric_base(trials, meta, metric_spec='all'):
         return get_metric_from_trials_base(trials, meta, metric_spec=metric_spec)
     else:
         return get_metric_from_probs_base(trials, meta, metric_spec=metric_spec)
+
+def update_metric(metric_dat_, meta):
+
+    uobj = list(set(meta['obj']))
+    uimg = list(meta['id'])
+
+    # I1 normalize
+    DAT = metric_dat_['I1_dprime']
+    OUT_C = copy.deepcopy(DAT)
+    OUT_Z = copy.deepcopy(DAT)
+
+    for uo in uobj:
+        tid = meta[meta['obj'] == uo]['id']
+        ind = [uimg.index(ti) for ti in tid]
+        for i in range(len(DAT)):
+            for j in range(2):
+                tmp = DAT[i][j][ind]
+                mu, sig = np.nanmean(tmp), np.nanstd(tmp)
+                for ii in ind:
+                    OUT_C[i][j][ii] = (DAT[i][j][ii] - mu)
+                    OUT_Z[i][j][ii] = (DAT[i][j][ii] - mu)/sig
+    metric_dat_['I1_dprime_C'] = OUT_C
+    metric_dat_['I1_dprime_Z'] = OUT_Z
+
+    # I2 normalize
+    DAT = metric_dat_['I2_dprime']
+    OUT_C = copy.deepcopy(DAT)
+    OUT_Z = copy.deepcopy(DAT)
+
+    for oi,uo in enumerate(uobj):
+        tid = meta[meta['obj'] == uo]['id']
+        ind = [uimg.index(ti) for ti in tid]
+        for oj,uo2 in enumerate(uobj):
+            for i in range(len(DAT)):
+                for j in range(2):
+                    tmp = DAT[i][j][ind,oj]
+                    mu, sig = np.nanmean(tmp), np.nanstd(tmp)
+                    for ii in ind:
+                        OUT_C[i][j][ii,oj] = (DAT[i][j][ii,oj] - mu)
+                        OUT_Z[i][j][ii,oj] = (DAT[i][j][ii,oj] - mu)/sig
+    metric_dat_['I2_dprime_C'] = OUT_C
+    metric_dat_['I2_dprime_Z'] = OUT_Z
+    return metric_dat_
+
         
 def compute_behavioral_metrics(trials, meta, niter, metric_spec='all', noise_model='trial_samples'):
     metrics = [
@@ -345,17 +394,21 @@ def compute_behavioral_metrics(trials, meta, niter, metric_spec='all', noise_mod
         'I1_dprime_c', 'I1_accuracy_c', 'I1_hitrate_c'
         ]
 
+    metrics_2 = ['I1_dprime_v2', 'O1_dprime_v2', 'I1_dprime_c_v2']
+
     if noise_model == None:
         # run on all trials just once without any sampling
         rec_all = get_metric_base(trials, meta, metric_spec=metric_spec)
-
-    rec = {k: [] for k in metrics}
+        rec_a_all = get_metric_augmented(trials, meta)
+    rec = {k: [] for k in metrics + metrics_2}
     
     ntrials = trials.shape[0]
     for i in range(niter):
         if noise_model == None:
             rec1 = rec_all
             rec2 = rec_all
+            rec_a1 = rec_a_all
+            rec_a2 = rec_a_all
         else: # if noise_model == 'trial_samples':
             tr = np.arange(ntrials)
             random.shuffle(tr)
@@ -363,8 +416,15 @@ def compute_behavioral_metrics(trials, meta, niter, metric_spec='all', noise_mod
             tr2 = tr[int(len(tr)/2):]
             rec1 = get_metric_base(trials[tr1], meta, metric_spec=metric_spec)
             rec2 = get_metric_base(trials[tr2], meta, metric_spec=metric_spec)
+            rec_a1 = get_metric_augmented(trials[tr1], meta)
+            rec_a2 = get_metric_augmented(trials[tr2], meta)
+
         for fn in metrics:
             rec[fn].append([rec1[fn], rec2[fn]])
+        for fn in metrics_2:
+            rec[fn].append([rec_a1[fn], rec_a2[fn]])
+
+    rec = update_metric(rec, meta)
     return rec
     
 def augment_behavioral_metrics(trials, meta, rec_precomputed, noise_model='trial_samples'):

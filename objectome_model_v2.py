@@ -13,9 +13,9 @@ import sys
 
 OPT_DEFAULT = {
     'classifiertype': 'softmax',
-    'npc_train': 90,
-    'npc_test': 10,
-    'n_splits': 1,
+    'npc_train': 50,
+    'npc_test': 50,
+    'n_splits': 10,
     'train_q': {},
     'test_q': {},
     'objects_oi': obj.models_combined24,
@@ -29,7 +29,7 @@ METRIC_KWARGS = {
     'svm': {'model_type': 'libSVM',
             'model_kwargs': {
                 'C': 50000, 'class_weight': 'auto',
-                'kernel': 'linear', 'probability': False}},
+                'kernel': 'linear', 'probability': True}},
     'mcc': {'model_type': 'MCC2',
             'model_kwargs': {'fnorm': True, 'snorm': False}},
     'rbfsvm': {'model_type': 'libSVM',
@@ -59,14 +59,16 @@ im240 = [meta_id_list.index(ii) for ii in imgids]
 def get_opt(imgset, modelname):
     opt = copy.deepcopy(OPT_DEFAULT)
     opt['model_spec'] = modelname
-    if imgset == 'im240':
+    if imgset in ['im240', 'im240/']:
         opt['train_q'] = lambda x: (x['id'] not in set(imgids))
         opt['test_q'] = lambda x: (x['id'] in set(imgids))
-        opt['npc_train'] = 90
-    elif imgset == 'im2400':
+        opt['n_splits'] = 100
+        opt['npc_train'] = 50
+        opt['npc_test'] = 10
+    elif imgset in ['im2400', 'im2400/']:
         opt['train_q'] = {}
         opt['test_q'] = {}
-        opt['n_splits'] = 50
+        opt['n_splits'] = 20
         opt['npc_train'] = 50
         opt['npc_test'] = 50
     return  opt
@@ -115,19 +117,23 @@ def multiclass_classification(features, meta, opt, outfn=None):
              }
     rec = utils.compute_metric_base(features, meta, evalc, attach_models=True, return_splits=True)
     trials = multiclass_rec_to_trials(rec, features, meta)
-    pk.dump(trials, open(outfn, 'wb'))
-    return
+    if outfn is not None:
+        pk.dump(trials, open(outfn, 'wb'))
+    return trials
 
 def main(argv):
     """" Input args : modelname imgset (no file/directory extensions)"""
+    #print 'RUNNING: ' +argv
     modelname = argv[0]
     imgset = argv[1]
+    if imgset[-1] != '/':
+        imgset = imgset + '/'
     opt = get_opt(imgset, modelname)
 
     feature_fn = feature_path + modelname + '.npy'
     features = np.load(feature_fn)
     meta = obj.objectome24_meta()
-    outfn = trial_path + imgset + '/' + modelname + '_multicls' + opt['classifiertype'] + '.pkl' 
+    outfn = trial_path + imgset + modelname + '_multicls' + opt['classifiertype'] + '.pkl' 
     multiclass_classification(features, meta, opt, outfn=outfn)
     return
 
