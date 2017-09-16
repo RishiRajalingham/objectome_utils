@@ -27,6 +27,7 @@ def dprime_from2x2(C, maxVal=5):
     return dprime, balacc, hitrate, corr_rej
 
 def trial_logicals(trials, meta):
+    """ From a set of trials, get logical indexing for task conditions (sample image/object, distracter object, etc... """
     uobjs = list(set(meta['obj']))
     nobjs = len(uobjs)
     uimgs = list(meta['id'])
@@ -40,367 +41,166 @@ def trial_logicals(trials, meta):
         if use_trial_samples:
             summary[i]['choice'] = np.array(trials['choice'] == OI)
 
-    return summary, use_trial_samples
+    image_summary =[{'id':[]} for i in range(nimgs)]
+    for i,OI in enumerate(uimgs):
+        image_summary[i]['id'] = (trials['id'] == OI)
+    return use_trial_samples, summary, image_summary
 
-def get_object_2x2(trials, meta, summary, i, use_trial_samples):
+def get_c2x2_from_logicals(Si, Di, Ci=None, trials=None):
     cont_table = np.zeros((2,2))
-    if use_trial_samples:
-        Si_Ci = np.logical_and(summary[i]['sam'], summary[i]['choice'])
-        Si_Cj = np.logical_and(summary[i]['sam'], np.logical_not(summary[i]['choice']))
-        Sj_Ci = np.logical_and(summary[i]['dist'], summary[i]['choice'])
-        Sj_Cj = np.logical_and(summary[i]['dist'], np.logical_not(summary[i]['choice']))
-        cont_table[0,0] = np.sum(Si_Ci)
-        cont_table[0,1] = np.sum(Si_Cj)
-        cont_table[1,0] = np.sum(Sj_Ci)
-        cont_table[1,1] = np.sum(Sj_Cj)
-    else:
-        xi = np.array(trials['prob_choice'][summary[i]['sam']]).astype('double')
-        xj = np.array(trials['prob_choice'][summary[i]['dist']]).astype('double')
+    if Ci is not None:
+        Si_i = np.logical_and(Si, Ci)
+        Si_ni = np.logical_and(Si, np.logical_not(Ci))
+        Di_i = np.logical_and(Di, Ci)
+        Di_ni = np.logical_and(Di, np.logical_not(Ci))
+        cont_table[0,0] = np.sum(Si_i)
+        cont_table[0,1] = np.sum(Si_ni)
+        cont_table[1,0] = np.sum(Di_i)
+        cont_table[1,1] = np.sum(Di_ni) 
+    elif trials is not None:
+        xi = np.array(trials['prob_choice'][Si]).astype('double')
+        xj = np.array(trials['prob_choice'][Di]).astype('double')
         cont_table[0,0] = np.nanmean(xi)
         cont_table[0,1] = 1-np.nanmean(xi)
         cont_table[1,0] = 1-np.nanmean(xj)
         cont_table[1,1] = np.nanmean(xj)
     return cont_table
 
-def get_image_2x2(trials, meta, summary, img_i, use_trial_samples):
-    
-    uobjs = list(set(meta['obj']))
-    nobjs = len(uobjs)
-    uimgs = list(meta['id'])
-    nimgs = len(uimgs)
-    cont_table = np.zeros((2,2))
-    OI = meta[meta['id'] == uimgs[img_i]]['obj']
-    obj_i = uobjs.index(OI)
-    tr_img_i = trials['id'] == uimgs[img_i]
-    
+def get_object_c2x2(trials, summary, obj_i, obj_j=None, use_trial_samples=False):
+    """ Get 2x2 object level contingency table for object i, distracter j """
+    Si, Di = summary[obj_i]['sam'], summary[obj_i]['dist']
+    if obj_j is not None:
+        Si = np.logical_and(Si, summary[obj_j]['dist'])
+        Di = np.logical_and(Di, summary[obj_j]['sam'])
+
     if use_trial_samples:
-
-        Si_Ci = np.logical_and(tr_img_i, summary[obj_i]['choice'])
-        Si_Cj = np.logical_and(tr_img_i, np.logical_not(summary[obj_i]['choice']))
-        Sj_Ci = np.logical_and(summary[obj_i]['dist'], summary[obj_i]['choice'])
-        Sj_Cj = np.logical_and(summary[obj_i]['dist'], np.logical_not(summary[obj_i]['choice']))
-        cont_table[0,0] = np.sum(Si_Ci)
-        cont_table[0,1] = np.sum(Si_Cj)
-        cont_table[1,0] = np.sum(Sj_Ci)
-        cont_table[1,1] = np.sum(Sj_Cj)
+        Ci = summary[obj_i]['choice']
+        return get_c2x2_from_logicals(Si, Di, Ci=Ci)
     else:
-        xi = np.array(trials['prob_choice'][tr_img_i]).astype('double')
-        xj = np.array(trials['prob_choice'][summary[obj_i]['dist']]).astype('double')
-        cont_table[0,0] = np.nanmean(xi)
-        cont_table[0,1] = 1-np.nanmean(xi)
-        cont_table[1,0] = 1-np.nanmean(xj)
-        cont_table[1,1] = np.nanmean(xj)
-    return cont_table
+        return get_c2x2_from_logicals(Si, Di, trials=trials)
 
-def get_metric_augmented(trials, meta):
-    """ get o1/i1 without calculating o2/i2"""
-    uobjs = list(set(meta['obj']))
-    nobjs = len(uobjs)
-    uimgs = list(meta['id'])
-    nimgs = len(uimgs)
-    rec = {}
-    rec['O1_dprime_v2'] = np.ones((nobjs, 1)) * np.nan
-    rec['O1_dprime_v2_exp'] = np.ones((nimgs, 1)) * np.nan
-    rec['I1_dprime_v2'] = np.ones((nimgs, 1)) * np.nan
+def get_image_c2x2(trials, summary, image_summary, img_i, obj_i, obj_j=None, use_trial_samples=False):
+    cont_table = np.zeros((2,2))
+    Si = image_summary[img_i]['id']
+    Di = summary[obj_i]['dist']
+    
+    if obj_j is not None:
+        Si = np.logical_and(Si, summary[obj_j]['dist'])
+        Di = np.logical_and(Di, summary[obj_j]['sam'])
 
-    summary, use_trial_samples = trial_logicals(trials, meta)
-
-    # loop through objects - one versus all
-    for i in range(nobjs):   
-        cont_table = get_object_2x2(trials, meta, summary, i, use_trial_samples)
-        dp,ba,hr,cr = dprime_from2x2(cont_table)
-        rec['O1_dprime_v2'][i,0] = dp
-        for ii in summary[i]['imgind']:
-            rec['O1_dprime_v2_exp'][ii,0] = dp
-
-    for i in range(nimgs):
-        cont_table = get_image_2x2(trials, meta, summary, i, use_trial_samples)
-        dp,ba,hr,cr = dprime_from2x2(cont_table)
-        rec['I1_dprime_v2'][i,0] = dp
-
-    rec['I1_dprime_c_v2'] = rec['I1_dprime_v2'] - rec['O1_dprime_v2_exp']
-   
-    return rec
-
-def get_metric_from_probs_base(trials, meta, metric_spec='all'):
-
-    dprime_maxval = 10
-    uobjs = list(set(meta['obj']))
-    nobjs = len(uobjs)
-    uimgs = list(meta['id'])
-    nimgs = len(uimgs)
-
-    rec = {}
-
-    rec['O2_dprime'] = np.ones((nobjs, nobjs)) * np.nan
-    rec['O2_accuracy'] = np.ones((nobjs, nobjs)) * np.nan
-    rec['O2_hitrate'] = np.ones((nobjs, nobjs)) * np.nan
-
-    rec['O2_dprime_exp'] = np.ones((nimgs, nobjs)) * np.nan
-    rec['O2_accuracy_exp'] = np.ones((nimgs, nobjs)) * np.nan
-    rec['O2_hitrate_exp'] = np.ones((nimgs, nobjs)) * np.nan
-
-    rec['I2_dprime']  = np.ones((nimgs,nobjs)) * np.nan
-    rec['I2_accuracy']  = np.ones((nimgs,nobjs)) * np.nan
-    rec['I2_hitrate']  = np.ones((nimgs,nobjs)) * np.nan
-    rec['I2_dprime_c']  = np.ones((nimgs,nobjs)) * np.nan
-    rec['I2_accuracy_c']  = np.ones((nimgs,nobjs)) * np.nan
-    rec['I2_hitrate_c']  = np.ones((nimgs,nobjs)) * np.nan
-
-    # precompute a bunch of logicals
-    summary = [{'sam':[],'dist':[],'choice':[],'imgind':[]} for i in range(nobjs)]
-    for i,OI in enumerate(uobjs):
-        summary[i]['sam'] = (trials['sample_obj'] == OI)
-        summary[i]['dist'] = (trials['dist_obj'] == OI)
-        summary[i]['imgind'] = np.array([uimgs.index(m['id']) for m in meta if (m['obj'] == OI) ])
-
-    for i in range(nobjs):   
-        img_ind_i = summary[i]['imgind']
-        for j in range(i+1, nobjs):
-            img_ind_j = summary[j]['imgind']
-
-            cont_table = np.zeros((2,2))
-            ti = summary[i]['sam'] & summary[j]['dist']
-            tj = summary[j]['sam'] & summary[i]['dist'] 
-            xi = np.array(trials['prob_choice'][ti]).astype('double')
-            xj = np.array(trials['prob_choice'][tj]).astype('double')
-
-            #xi = np.array([xx > 0.5 for xx in xi])
-            #xj = np.array([xx > 0.5 for xx in xj])
-
-            cont_table[0,0] = np.nanmean(xi)
-            cont_table[0,1] = 1 - np.nanmean(xi)
-            cont_table[1,0] = 1 - np.nanmean(xj)
-            cont_table[1,1] = np.nanmean(xj)
-            dp,ba,hr,cr = dprime_from2x2(cont_table, maxVal=dprime_maxval)
-            rec['O2_dprime'][i,j] = dp
-            rec['O2_accuracy'][i,j] = ba
-            rec['O2_hitrate'][i,j] = hr
-            rec['O2_hitrate'][j,i] = cr
-
-            for ii,jj in zip(img_ind_i, img_ind_j):
-                rec['O2_dprime_exp'][ii,j] = dp
-                rec['O2_hitrate_exp'][ii,j] = hr
-                rec['O2_accuracy_exp'][ii,j] = ba
-                rec['O2_dprime_exp'][jj,i] = dp
-                rec['O2_hitrate_exp'][jj,i] = cr
-                rec['O2_accuracy_exp'][jj,i] = ba
-
-        if metric_spec != 'all':
-            continue
-
-        for j in range(nimgs):
-            t_j = trials['id'] == uimgs[j] 
-            OJ = meta[meta['id'] == uimgs[j]]['obj']
-            j_ = uobjs.index(OJ)
-            if j_ == i:
-                continue
-            cont_table = np.zeros((2,2))
-            # read this next line as trials with: sample j, distracter I, choice J.
-
-            ti = t_j & summary[i]['dist'] 
-            tj = summary[i]['sam'] & summary[j_]['dist']
-            xi = np.array(trials['prob_choice'][ti]).astype('double')
-            xj = np.array(trials['prob_choice'][tj]).astype('double')
-
-            cont_table[0,0] = np.nanmean(xi)
-            cont_table[0,1] = 1 - np.nanmean(xi)
-            cont_table[1,0] = 1 - np.nanmean(xj)
-            cont_table[1,1] = np.nanmean(xj)
-
-            dp,ba,hr,cr = dprime_from2x2(cont_table, maxVal=dprime_maxval)
-            rec['I2_dprime'][j,i] = dp
-            rec['I2_accuracy'][j,i] = ba
-            rec['I2_hitrate'][j,i] = hr
-
-    rec['I2_dprime_c']= rec['I2_dprime'] - rec['O2_dprime_exp']
-    rec['I2_accuracy_c'] = rec['I2_accuracy'] - rec['O2_accuracy_exp']
-    rec['I2_hitrate_c'] = rec['I2_hitrate'] - rec['O2_hitrate_exp']
-
-    rec['I1_dprime'] = np.nanmean(rec['I2_dprime'], 1)
-    rec['I1_accuracy'] = np.nanmean(rec['I2_accuracy'], 1)
-    rec['I1_hitrate'] = np.nanmean(rec['I2_hitrate'], 1)
-
-    rec['I1_dprime_c'] = np.nanmean(rec['I2_dprime_c'], 1)
-    rec['I1_accuracy_c'] = np.nanmean(rec['I2_accuracy_c'], 1)
-    rec['I1_hitrate_c'] = np.nanmean(rec['I2_hitrate_c'], 1)
-
-    return rec
-
-def get_metric_from_trials_base(trials, meta, metric_spec='all'):
-          
-    uobjs = list(set(meta['obj']))
-    nobjs = len(uobjs)
-    uimgs  = list(meta['id'])
-    nimgs = len(uimgs)
-         
-    rec = {}
-
-    rec['O2_dprime'] = np.ones((nobjs, nobjs)) * np.nan
-    rec['O2_accuracy'] = np.ones((nobjs, nobjs)) * np.nan
-    rec['O2_hitrate'] = np.ones((nobjs, nobjs)) * np.nan
-
-    rec['O2_dprime_exp'] = np.ones((nimgs, nobjs)) * np.nan
-    rec['O2_accuracy_exp'] = np.ones((nimgs, nobjs)) * np.nan
-    rec['O2_hitrate_exp'] = np.ones((nimgs, nobjs)) * np.nan
-
-    rec['I2_dprime']  = np.ones((nimgs,nobjs)) * np.nan
-    rec['I2_accuracy']  = np.ones((nimgs,nobjs)) * np.nan
-    rec['I2_hitrate']  = np.ones((nimgs,nobjs)) * np.nan
-    rec['I2_dprime_c']  = np.ones((nimgs,nobjs)) * np.nan
-    rec['I2_accuracy_c']  = np.ones((nimgs,nobjs)) * np.nan
-    rec['I2_hitrate_c']  = np.ones((nimgs,nobjs)) * np.nan
-
-    # precompute a bunch of logicals
-    summary = [{'sam':[],'dist':[],'choice':[],'imgind':[]} for i in range(nobjs)]
-    for i,OI in enumerate(uobjs):
-        summary[i]['sam'] = np.array(trials['sample_obj'] == OI)
-        summary[i]['dist'] = np.array(trials['dist_obj'] == OI)
-        summary[i]['choice'] = np.array(trials['choice'] == OI)
-        summary[i]['imgind'] = np.array([uimgs.index(m['id']) for m in meta if (m['obj'] == OI) ])
-
-    for i in range(nobjs):   
-        img_ind_i = summary[i]['imgind']
-        for j in range(i+1, nobjs):
-            img_ind_j = summary[j]['imgind']
-
-            Si_Dj = np.logical_and(summary[i]['sam'], summary[j]['dist'])
-            Si_Dj_i = np.logical_and(Si_Dj, summary[i]['choice'])
-            Si_Dj_j = np.logical_and(Si_Dj, summary[j]['choice'])
-
-            Sj_Di = np.logical_and(summary[j]['sam'], summary[i]['dist'])
-            Sj_Di_i = np.logical_and(Sj_Di, summary[i]['choice'])
-            Sj_Di_j = np.logical_and(Sj_Di, summary[j]['choice'])
-
-            cont_table = np.zeros((2,2))
-            cont_table[0,0] = np.sum(Si_Dj_i)
-            cont_table[0,1] = np.sum(Si_Dj_j)
-            cont_table[1,0] = np.sum(Sj_Di_i)
-            cont_table[1,1] = np.sum(Sj_Di_j)
-            dp,ba,hr,cr = dprime_from2x2(cont_table)
-            rec['O2_dprime'][i,j] = dp
-            rec['O2_accuracy'][i,j] = ba
-            rec['O2_hitrate'][i,j] = hr
-            rec['O2_hitrate'][j,i] = cr
-
-            for ii,jj in zip(img_ind_i, img_ind_j):
-                rec['O2_dprime_exp'][ii,j] = dp
-                rec['O2_hitrate_exp'][ii,j] = hr
-                rec['O2_accuracy_exp'][ii,j] = ba
-                rec['O2_dprime_exp'][jj,i] = dp
-                rec['O2_hitrate_exp'][jj,i] = cr
-                rec['O2_accuracy_exp'][jj,i] = ba
-
-        if metric_spec != 'all':
-            continue
-
-        for j in range(nimgs):
-            t_j = np.array(trials['id'] == uimgs[j])
-            OJ = meta[meta['id'] == uimgs[j]]['obj']
-            j_ = uobjs.index(OJ)
-            if j_ == i:
-                continue
-            cont_table = np.zeros((2,2))
-
-            Sj_Di = np.logical_and(t_j, summary[i]['dist'])
-            Sj_Di_j = np.logical_and(Sj_Di, summary[j_]['choice'])
-            Sj_Di_i = np.logical_and(Sj_Di, summary[i]['choice'])
-
-            Si_Dj = np.logical_and(summary[i]['sam'], summary[j_]['dist'])
-            Si_Dj_j = np.logical_and(Si_Dj, summary[j_]['choice'])
-            Si_Dj_i = np.logical_and(Si_Dj, summary[i]['choice'])
-
-            # read this next line as trials with: sample j, distracter I, choice J.
-            cont_table[0,0] = np.sum(Sj_Di_j)
-            cont_table[0,1] = np.sum(Sj_Di_i)
-            cont_table[1,0] = np.sum(Si_Dj_j)
-            cont_table[1,1] = np.sum(Si_Dj_i)
-
-            dp,ba,hr,cr = dprime_from2x2(cont_table)
-            rec['I2_dprime'][j,i] = dp
-            rec['I2_accuracy'][j,i] = ba
-            rec['I2_hitrate'][j,i] = hr
-
-    rec['I2_dprime_c']= rec['I2_dprime'] - rec['O2_dprime_exp']
-    rec['I2_accuracy_c'] = rec['I2_accuracy'] - rec['O2_accuracy_exp']
-    rec['I2_hitrate_c'] = rec['I2_hitrate'] - rec['O2_hitrate_exp']
-
-    rec['I1_dprime'] = np.nanmean(rec['I2_dprime'], 1)
-    rec['I1_accuracy'] = np.nanmean(rec['I2_accuracy'], 1)
-    rec['I1_hitrate'] = np.nanmean(rec['I2_hitrate'], 1)
-
-    rec['I1_dprime_c'] = np.nanmean(rec['I2_dprime_c'], 1)
-    rec['I1_accuracy_c'] = np.nanmean(rec['I2_accuracy_c'], 1)
-    rec['I1_hitrate_c'] = np.nanmean(rec['I2_hitrate_c'], 1)
-
-    return rec
-
-def get_metric_base(trials, meta, metric_spec='all'):
-    if 'choice' in list(trials.dtype.names):
-        return get_metric_from_trials_base(trials, meta, metric_spec=metric_spec)
+    if use_trial_samples:
+        Ci = summary[obj_i]['choice']
+        return get_c2x2_from_logicals(Si, Di, Ci=Ci)
     else:
-        return get_metric_from_probs_base(trials, meta, metric_spec=metric_spec)
+        return get_c2x2_from_logicals(Si, Di, trials=trials)
 
-def update_metric(metric_dat_, meta):
+def normalize_by_object(metric, img_ind_per_obj):
+    if metric.ndim == 1:
+        N = 1
+    else:
+        N = metric.shape[1]
+    metric_n = copy.deepcopy(metric)
+    for ind_i in img_ind_per_obj:
+        for j in range(N):
+            tmp = metric[ind_i,j]
+            mu = np.nanmean(tmp)
+            for ii in ind_i:
+                metric_n[ii,j] = (metric[ii,j] - mu)
+    return metric_n                
 
-    uobj = list(set(meta['obj']))
-    uimg = list(meta['id'])
+def get_metric_base(trials, meta, compute_O=True, compute_I=True):
 
-    # I1 normalize
-    DAT = metric_dat_['I1_dprime']
-    OUT_C = copy.deepcopy(DAT)
-    OUT_Z = copy.deepcopy(DAT)
+    uobjs, uimgs = list(set(meta['obj'])), list(meta['id'])
+    nobjs, nimgs = len(uobjs), len(uimgs)
+    use_trial_samples, summary, image_summary = trial_logicals(trials, meta)
+    if use_trial_samples:
+        dprime_maxval = 10
+    else:
+        dprime_maxval = 5
 
-    for uo in uobj:
-        tid = meta[meta['obj'] == uo]['id']
-        ind = [uimg.index(ti) for ti in tid]
-        for i in range(len(DAT)):
-            for j in range(2):
-                tmp = DAT[i][j][ind]
-                mu, sig = np.nanmean(tmp), np.nanstd(tmp)
-                for ii in ind:
-                    OUT_C[i][j][ii] = (DAT[i][j][ii] - mu)
-                    OUT_Z[i][j][ii] = (DAT[i][j][ii] - mu)/sig
-    metric_dat_['I1_dprime_C'] = OUT_C
-    metric_dat_['I1_dprime_Z'] = OUT_Z
+    rec = {}
+    if compute_O:
+        # object level metrics
+        rec['O1_dprime'] = np.ones((nobjs, 1)) * np.nan
+        rec['O1_accuracy'] = np.ones((nobjs, 1)) * np.nan
+        rec['O1_hitrate'] = np.ones((nobjs, 1)) * np.nan
 
-    # I2 normalize
-    DAT = metric_dat_['I2_dprime']
-    OUT_C = copy.deepcopy(DAT)
-    OUT_Z = copy.deepcopy(DAT)
-
-    for oi,uo in enumerate(uobj):
-        tid = meta[meta['obj'] == uo]['id']
-        ind = [uimg.index(ti) for ti in tid]
-        for oj,uo2 in enumerate(uobj):
-            for i in range(len(DAT)):
-                for j in range(2):
-                    tmp = DAT[i][j][ind,oj]
-                    mu, sig = np.nanmean(tmp), np.nanstd(tmp)
-                    for ii in ind:
-                        OUT_C[i][j][ii,oj] = (DAT[i][j][ii,oj] - mu)
-                        OUT_Z[i][j][ii,oj] = (DAT[i][j][ii,oj] - mu)/sig
-    metric_dat_['I2_dprime_C'] = OUT_C
-    metric_dat_['I2_dprime_Z'] = OUT_Z
-    return metric_dat_
-
+        rec['O2_dprime'] = np.ones((nobjs, nobjs)) * np.nan
+        rec['O2_accuracy'] = np.ones((nobjs, nobjs)) * np.nan
+        rec['O2_hitrate'] = np.ones((nobjs, nobjs)) * np.nan
         
-def compute_behavioral_metrics(trials, meta, niter, metric_spec='all', noise_model='trial_samples'):
+        for i in range(nobjs):   
+            o1_2x2 = get_object_c2x2(trials, summary, i, obj_j=None, use_trial_samples=use_trial_samples)
+            dp,ba,hr,cr = dprime_from2x2(o1_2x2, maxVal=dprime_maxval)
+            rec['O1_dprime'][i,0] = dp
+            rec['O1_accuracy'][i,0] = ba
+            rec['O1_hitrate'][i,0] = hr
+            
+            for j in range(i+1, nobjs):
+                o2_2x2 = get_object_c2x2(trials, summary, i, obj_j=j, use_trial_samples=use_trial_samples)
+                dp,ba,hr,cr = dprime_from2x2(o2_2x2, maxVal=dprime_maxval)
+                rec['O2_dprime'][i,j] = dp
+                rec['O2_accuracy'][i,j] = ba
+                rec['O2_hitrate'][i,j] = hr
+                rec['O2_hitrate'][j,i] = cr
+
+    if compute_I:
+        # image level metrics
+        rec['I1_dprime']  = np.ones((nimgs, 1)) * np.nan
+        rec['I1_accuracy']  = np.ones((nimgs, 1)) * np.nan
+        rec['I1_hitrate']  = np.ones((nimgs, 1)) * np.nan
+
+        rec['I2_dprime']  = np.ones((nimgs,nobjs)) * np.nan
+        rec['I2_accuracy']  = np.ones((nimgs,nobjs)) * np.nan
+        rec['I2_hitrate']  = np.ones((nimgs,nobjs)) * np.nan
+
+        for i in range(nimgs):
+            obj_i = uobjs.index(meta[meta['id'] == uimgs[i]]['obj'])
+            i1_2x2 = get_image_c2x2(trials, summary, image_summary, i, obj_i, obj_j=None, use_trial_samples=use_trial_samples)
+            dp,ba,hr,cr = dprime_from2x2(i1_2x2, maxVal=dprime_maxval)
+            rec['I1_dprime'][i,0] = dp
+            rec['I1_accuracy'][i,0] = ba
+            rec['I1_hitrate'][i,0] = hr
+
+            for j in range(nobjs):
+                i2_2x2 = get_image_c2x2(trials, summary, image_summary, i, obj_i, obj_j=j, use_trial_samples=use_trial_samples)
+                dp,ba,hr,cr = dprime_from2x2(i2_2x2, maxVal=dprime_maxval)
+                rec['I2_dprime'][i,j] = dp
+                rec['I2_accuracy'][i,j] = ba
+                rec['I2_hitrate'][i,j] = hr
+
+        # alternative metric computation -- average rather than pool
+        rec['O1_dprime_v2'] = np.nanmean(rec['O2_dprime'], 1)
+        rec['O1_dprime_v2'] = np.reshape(rec['O1_dprime_v2'], (rec['O1_dprime_v2'].shape[0], 1))
+        rec['I1_dprime_v2'] = np.nanmean(rec['I2_dprime'], 1)
+        rec['I1_dprime_v2'] = np.reshape(rec['I1_dprime_v2'], (rec['I1_dprime_v2'].shape[0], 1))
+
+        # normalizations
+        img_ind_per_obj = []
+        for uo in uobjs:
+            tid = meta[meta['obj'] == uo]['id']
+            ind = [uimgs.index(ti) for ti in tid]
+            img_ind_per_obj.append(ind)
+
+        rec['I1_dprime_C'] = normalize_by_object(rec['I1_dprime'], img_ind_per_obj)
+        rec['I1_dprime_v2_C'] = normalize_by_object(rec['I1_dprime_v2'], img_ind_per_obj)
+        rec['I2_dprime_C'] = normalize_by_object(rec['I2_dprime'], img_ind_per_obj)
+
+    return rec
+
+def compute_behavioral_metrics(trials, meta, niter, compute_O=True, compute_I=True, noise_model='trial_samples'):
     metrics = [
+        'O1_dprime', 'O1_accuracy', 'O1_hitrate', 'O1_dprime_v2',
+        'I1_dprime', 'I1_accuracy', 'I1_hitrate', 'I1_dprime_v2', 
         'O2_dprime', 'O2_accuracy', 'O2_hitrate', 
         'I2_dprime', 'I2_accuracy', 'I2_hitrate', 
-        'I1_dprime', 'I1_accuracy', 'I1_hitrate', 
-        'I2_dprime_c', 'I2_accuracy_c', 'I2_hitrate_c', 
-        'I1_dprime_c', 'I1_accuracy_c', 'I1_hitrate_c'
+        'I1_dprime_C', 'I1_dprime_v2_C', 'I2_dprime_C'
         ]
-
-    metrics_2 = ['I1_dprime_v2', 'O1_dprime_v2', 'I1_dprime_c_v2']
 
     if noise_model == None:
         # run on all trials just once without any sampling
-        rec_all = get_metric_base(trials, meta, metric_spec=metric_spec)
-        rec_a_all = get_metric_augmented(trials, meta)
-    rec = {k: [] for k in metrics + metrics_2}
+        rec_all = get_metric_base(trials, meta, compute_O=compute_O, compute_I=compute_I)
+    rec = {k: [] for k in metrics}
     
     ntrials = trials.shape[0]
     for i in range(niter):
@@ -414,45 +214,12 @@ def compute_behavioral_metrics(trials, meta, niter, metric_spec='all', noise_mod
             random.shuffle(tr)
             tr1 = tr[:int(len(tr)/2)]
             tr2 = tr[int(len(tr)/2):]
-            rec1 = get_metric_base(trials[tr1], meta, metric_spec=metric_spec)
-            rec2 = get_metric_base(trials[tr2], meta, metric_spec=metric_spec)
-            rec_a1 = get_metric_augmented(trials[tr1], meta)
-            rec_a2 = get_metric_augmented(trials[tr2], meta)
-
+            rec1 = get_metric_base(trials[tr1], meta, compute_O=compute_O, compute_I=compute_I)
+            rec2 = get_metric_base(trials[tr2], meta, compute_O=compute_O, compute_I=compute_I)
+            
         for fn in metrics:
-            rec[fn].append([rec1[fn], rec2[fn]])
-        for fn in metrics_2:
-            rec[fn].append([rec_a1[fn], rec_a2[fn]])
-
-    rec = update_metric(rec, meta)
-    return rec
-    
-def augment_behavioral_metrics(trials, meta, rec_precomputed, noise_model='trial_samples'):
-    if noise_model == None:
-        # run on all trials just once without any sampling
-        rec_all = get_metric_augmented(trials, meta)
-    metrics = ['I1_dprime_v2', 'O1_dprime_v2', 'I1_dprime_c_v2']
-    rec = rec_precomputed
-    for k in metrics:
-        rec[k] = []
-    
-    niter = len(rec['O2_dprime'])
-    niter = min(niter,2)
-    
-    ntrials = trials.shape[0]
-    for i in range(niter):
-        if noise_model == None:
-            rec1 = rec_all
-            rec2 = rec_all
-        else: # if noise_model == 'trial_samples':
-            tr = np.arange(ntrials)
-            random.shuffle(tr)
-            tr1 = tr[:int(len(tr)/2)]
-            tr2 = tr[int(len(tr)/2):]
-            rec1 = get_metric_augmented(trials[tr1], meta)
-            rec2 = get_metric_augmented(trials[tr2], meta)
-        for fn in metrics:
-            rec[fn].append([rec1[fn], rec2[fn]])
+            if (fn in rec1) & (fn in rec2):
+                rec[fn].append([rec1[fn], rec2[fn]])
     return rec
 
 """
@@ -477,7 +244,7 @@ def nnan_consistency(A,B, corrtype='pearson', ignore_vals=None):
     elif corrtype == 'spearman':
         return spearmanr(A, B)[0]
 
-def pairwise_consistency(A,B, metricn='I1_dprime_z', corrtype='pearson', img_subsample=None, ignore_vals=None):
+def pairwise_consistency(A, B, metricn='I1_dprime_C', corrtype='pearson', img_subsample=None, ignore_vals=None):
     niter = min(len(A[metricn]), len(B[metricn]))
     out = {'IC_a':[], 'IC_b':[], 'rho':[], 'rho_n':[], 'rho_n_sq':[]}
     for i in range(niter):
