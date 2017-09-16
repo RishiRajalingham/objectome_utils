@@ -117,6 +117,11 @@ def objectome64_meta():
 def objectome24_meta():
     return pk.load(open(stim_path + 'objectome24s100/metadata.pkl', 'r'))
 
+def objectome24_meta_random_240subsample():
+    return pk.load(open(stim_path + 'objectome24s100/metadata_random_subsample.pkl', 'r'))
+
+
+
 
 def objectome_stimpath():
     return stim_path + 'objectome64s100/'

@@ -4,12 +4,6 @@ import numpy as np
 from scipy.stats import norm, pearsonr, spearmanr
 from objectome_utils import nanzscore
 
-
-"""
-Basic metric computations from aggregated trials to random split-halves of
-trials, image data (summary data structure), and metrics.
-"""
-
 import warnings
 warnings.filterwarnings("ignore",category=DeprecationWarning)
 warnings.filterwarnings("ignore",category=RuntimeWarning)
@@ -95,13 +89,9 @@ def get_image_c2x2(trials, summary, image_summary, img_i, obj_i, obj_j=None, use
         return get_c2x2_from_logicals(Si, Di, trials=trials)
 
 def normalize_by_object(metric, img_ind_per_obj):
-    if metric.ndim == 1:
-        N = 1
-    else:
-        N = metric.shape[1]
     metric_n = copy.deepcopy(metric)
     for ind_i in img_ind_per_obj:
-        for j in range(N):
+        for j in range(metric.shape[1]):
             tmp = metric[ind_i,j]
             mu = np.nanmean(tmp)
             for ii in ind_i:
@@ -113,11 +103,10 @@ def get_metric_base(trials, meta, compute_O=True, compute_I=True):
     uobjs, uimgs = list(set(meta['obj'])), list(meta['id'])
     nobjs, nimgs = len(uobjs), len(uimgs)
     use_trial_samples, summary, image_summary = trial_logicals(trials, meta)
-    if use_trial_samples:
-        dprime_maxval = 10
-    else:
-        dprime_maxval = 5
-
+    dprime_maxval = 5
+    # if use_trial_samples:
+    #     dprime_maxval = 10
+    
     rec = {}
     if compute_O:
         # object level metrics
@@ -144,6 +133,9 @@ def get_metric_base(trials, meta, compute_O=True, compute_I=True):
                 rec['O2_hitrate'][i,j] = hr
                 rec['O2_hitrate'][j,i] = cr
 
+        rec['O1_dprime_v2'] = np.nanmean(rec['O2_dprime'], 1)
+        rec['O1_dprime_v2'] = np.reshape(rec['O1_dprime_v2'], (rec['O1_dprime_v2'].shape[0], 1))
+
     if compute_I:
         # image level metrics
         rec['I1_dprime']  = np.ones((nimgs, 1)) * np.nan
@@ -169,9 +161,6 @@ def get_metric_base(trials, meta, compute_O=True, compute_I=True):
                 rec['I2_accuracy'][i,j] = ba
                 rec['I2_hitrate'][i,j] = hr
 
-        # alternative metric computation -- average rather than pool
-        rec['O1_dprime_v2'] = np.nanmean(rec['O2_dprime'], 1)
-        rec['O1_dprime_v2'] = np.reshape(rec['O1_dprime_v2'], (rec['O1_dprime_v2'].shape[0], 1))
         rec['I1_dprime_v2'] = np.nanmean(rec['I2_dprime'], 1)
         rec['I1_dprime_v2'] = np.reshape(rec['I1_dprime_v2'], (rec['I1_dprime_v2'].shape[0], 1))
 
