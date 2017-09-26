@@ -1,6 +1,7 @@
 import numpy as np 
 import scipy as sp
 
+""" General purpose utils """
 
 def nanzscore(x, mean_only=False):
     if mean_only:
@@ -33,9 +34,8 @@ def bin_variable(factor, prctile_step=10):
     factor_centers = grpstats(factor, factor_b)[1]
     return factor_b, factor_centers    
 
+"""  Convert euler angles (in degrees, rx->ry->rz) to Quaternions """
 
-
-# Convert euler angles (in degrees, rx->ry->rz) to Quaternions
 def euler2q(rx0, ry0, rz0):
     import Quaternion as Q
     rx = rx0 * (np.pi / 180) / 2
@@ -53,103 +53,50 @@ def euler2q(rx0, ry0, rz0):
     w = cx*cy*cz + sx*sy*sz
     return Q.Quat(Q.normalize([x, y, z, w])).q
 
-
 def get_quat_diff(q, q0):
     q = np.array(q)
     q0 = np.array(q0)
     dot = np.sum(q*q0)
     return np.arccos(abs(dot))
 
-# # compute quaternion difference
-# def get_quat_diff(q, q0):
-#     import Quaternion as Q
-#     Qq = Q.Quat(q)
-#     Qq0 = Q.Quat(q0)
-#     Qdiff = Qq * Qq0.inv()
-#     return np.arccos(np.abs(Qdiff.q))
+""" Linear reg - variance explained functions"""
+from sklearn import linear_model
+import objectome_utils as obj 
+from copy import deepcopy
 
+def lin_predict_cv(x, y1, y2):
+    t = np.squeeze(np.isfinite(y1))
+    x = np.squeeze(x[t,:])
+    y1 = np.squeeze(y1[t,:])
+    y2 = np.squeeze(y2[t,:])
+    regr = linear_model.LinearRegression()
+    regr.fit(x,y1)
+    return regr.predict(x), y2
 
+def get_lin_variance_explained(x,y1,y2):
+    z1,yy2 = lin_predict_cv(x,y1,y2)
+    z2,yy1 = lin_predict_cv(x,y2,y1)
+    
+    ic1 = obj.nnan_consistency(yy1, yy2)
+    ic2 = obj.nnan_consistency(z1, z2)
+    rho1 = obj.nnan_consistency(yy1, z2)
+    rho2 = obj.nnan_consistency(yy2, z1)
+    
+    return np.nanmean([rho1, rho2])**2 / (ic1*ic2)
+    
+def unique_lin_variance(x,y1,y2,fi):
+    varexp_all = get_lin_variance_explained(x,y1,y2)
+    x2 = deepcopy(x)
+    x2[:,fi] = 0
+    varexp_exc = get_lin_variance_explained(x2,y1,y2)
+    x3 = deepcopy(x)
+    for i in range(x3.shape[1]):
+        if i != fi:
+            x3[:,i]  = 0
+    varexp_only =  get_lin_variance_explained(x3,y1,y2)
+    return varexp_all, varexp_exc, varexp_only
 
-
-
-def features_to_metrics(features, meta, suffix=''):
-    data = np.load(featurespath + f + '.npy')
-    all_features[f] = data
-    all_metas[f] = meta
-    trials = obj.testFeatures(all_features, all_metas, fnames, obj.models_combined24)
-    outfn = datapath + 'trials/' + f + suffix + '.pkl'
-    pk.dump(trials, open(outfn, 'wb'))
-    print '%10.2f seconds' % (time.time() - t)
-    print 'saved ' + outfn
-    return
-
-def trials_to_metrics(trials_dict, compute_metrics={'I1_dprime','I1_hitrate','I2_hitrate', 'I2_dprime', 'O1_dprime','O2_dprime'}, suffix=''):
-    for f in trials_dict:
-        t = time.time()
-        metrics, imgdata = obj.compute_behavioral_metrics(trials_dict[f], meta, compute_metrics=compute_metrics, O2_normalize=True)
-        outfn = datapath + 'metrics/' + suffix + f + '_objectome24.pkl'
-        outfn_2 = datapath + 'splithalf_imgdata/' + suffix + f + '_objectome24.pkl'
-        # save_metrics(metrics, outfn)
-        pk.dump(metrics, open(outfn, 'wb'))
-        pk.dump(imgdata, open(outfn_2, 'wb'))
-        print '%10.2f seconds' % (time.time() - t)
-        print 'saved ' + outfn
-    return
-
-
-# def pairwise_consistency(A,B, metricn):
-#     niter = min(len(A), len(B))
-#     out = {'IC_a':[], 'IC_b':[], 'rho':[], 'rho_n':[]}
-#     for i in range(niter):
-#         a0,a1 = A[metricn][i][0], A[metricn][i][1]
-#         b0,b1 = B[metricn][i][0], B[metricn][i][1]
-        
-#         ic_a = nnan_consistency(a0,a1)
-#         ic_b = nnan_consistency(b0,b1)
-#         out['IC_a'].append(ic_a)
-#         out['IC_b'].append(ic_b)
-
-#         rho_tmp = [];
-#         rho_tmp.append(nnan_consistency(a0,b0))
-#         rho_tmp.append(nnan_consistency(a1,b0))
-#         rho_tmp.append(nnan_consistency(a0,b1))
-#         rho_tmp.append(nnan_consistency(a1,b1))
-        
-#         out['rho'].append(np.mean(rho_tmp))
-#         out['rho_n'].append( np.mean(rho_tmp) / ((ic_a*ic_b)**0.5) )
-
-#     return out
-
-# def pairwise_consistency(A,B, metricn):
-#     niter = min(len(A), len(B))
-#     out = {'IC_a':[], 'IC_b':[], 'rho':[], 'rho_n':[]}
-#     for i in range(niter):
-#         a0,a1 = A[i][0][metricn], A[i][1][metricn]
-#         b0,b1 = B[i][0][metricn], B[i][1][metricn]
-        
-#         ic_a = nnan_consistency(a0,a1)
-#         ic_b = nnan_consistency(b0,b1)
-#         out['IC_a'].append(ic_a)
-#         out['IC_b'].append(ic_b)
-
-#         rho_tmp = [];
-#         rho_tmp.append(nnan_consistency(a0,b0))
-#         rho_tmp.append(nnan_consistency(a1,b0))
-#         rho_tmp.append(nnan_consistency(a0,b1))
-#         rho_tmp.append(nnan_consistency(a1,b1))
-        
-#         out['rho'].append(np.mean(rho_tmp))
-#         out['rho_n'].append( np.mean(rho_tmp) / ((ic_a*ic_b)**0.5) )
-
-#     return out
-
-
-def nnan_consistency(A,B, corrtype='pearson'):
-    ind = np.isfinite(A) & np.isfinite(B)
-    if corrtype == 'pearson':
-        return sp.stats.pearsonr(A[ind], B[ind])[0]
-    elif corrtype == 'spearman':
-        return sp.stats.spearmanr(A[ind], B[ind])[0]
+    """ dictionary utils """
 
 def concatenate_dictionary(dict_tuple, fns=None):
     concat_dict = {}

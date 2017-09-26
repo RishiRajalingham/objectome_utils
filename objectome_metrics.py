@@ -89,13 +89,13 @@ def get_image_c2x2(trials, summary, image_summary, img_i, obj_i, obj_j=None, use
         return get_c2x2_from_logicals(Si, Di, trials=trials)
 
 def normalize_by_object(metric, img_ind_per_obj):
-    metric_n = copy.deepcopy(metric)
-    for ind_i in img_ind_per_obj:
-        for j in range(metric.shape[1]):
-            tmp = metric[ind_i,j]
-            mu = np.nanmean(tmp)
-            for ii in ind_i:
-                metric_n[ii,j] = (metric[ii,j] - mu)
+        metric_n = copy.deepcopy(metric)
+        for ind_i in img_ind_per_obj:
+            for j in range(metric.shape[1]):
+                tmp = metric[ind_i,j]
+                mu = np.nanmean(tmp)
+                for ii in ind_i:
+                    metric_n[ii,j] = (metric[ii,j] - mu)
     return metric_n                
 
 def get_metric_base(trials, meta, compute_O=True, compute_I=True):
