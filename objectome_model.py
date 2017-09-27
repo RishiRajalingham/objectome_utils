@@ -8,11 +8,13 @@ import numpy as np
 import cPickle as pk
 import tabular as tb
 import dldata.metrics.utils as utils
+import dldata.metrics.classifier as dldat_cls
 import objectome_utils as obj
 import sys
 
 OPT_DEFAULT = {
-    'classifiertype': 'softmax',
+    'classifiertype': 'svm',
+    # 'classifiertype': 'softmax',
     'npc_train': 50,
     'npc_test': 50,
     'n_splits': 10,
@@ -54,8 +56,6 @@ imgids = pk.load(open(img_sample_fn, 'r'))
 meta_id_list = list(meta['id'])
 im240 = [meta_id_list.index(ii) for ii in imgids]
 
-
-
 def get_opt(imgset, modelname):
     opt = copy.deepcopy(OPT_DEFAULT)
     opt['model_spec'] = modelname
@@ -73,16 +73,34 @@ def get_opt(imgset, modelname):
         opt['npc_test'] = 50
     return  opt
 
+def normalize_features(train_features, test_features, labelset, trace_normalize=False):
+    train_features, train_mean, train_std, trace = dldat_cls.normalize(
+                              [train_features], trace_normalize=trace_normalize)
+    train_data = {'train_mean': train_mean,
+                  'train_std': train_std,
+                  'trace': trace,
+                  'labelset': labelset,
+                  'labelmap': None}
+
+    test_features, train_mean, train_std, trace = dldat_cls.normalize(
+              [test_features], data=train_data, trace_normalize=trace_normalize)
+    return test_features
+
 def multiclass_rec_to_trials(rec, features, meta):
     trial_records = []
     for s_i, s_res in enumerate(rec['split_results']):
-        model = s_res['model']
+        train = rec['splits'][0][s_i]['train']
+        test = rec['splits'][0][s_i]['test']
+        train_features = features[train,:]
+        test_features = features[test,:]
+        
         labelset = list(s_res['labelset'])
-        te_split = rec['splits'][0][s_i]['test']
-        te_true_labels = meta['obj'][te_split]
-        proba = model.predict_proba(features[te_split,:])
+        model = s_res['model']
 
-        for i,ii in enumerate(te_split):
+        test_features = normalize_features(train_features, test_features, labelset)
+        proba = model.predict_proba(test_features)
+
+        for i,ii in enumerate(test):
             imgid = meta[ii]['id']
             true_label = meta[ii]['obj']
             true_ind = labelset.index(true_label)
