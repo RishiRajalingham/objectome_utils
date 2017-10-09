@@ -103,9 +103,10 @@ def get_metric_base(trials, meta, compute_O=True, compute_I=True):
     uobjs, uimgs = list(set(meta['obj'])), list(meta['id'])
     nobjs, nimgs = len(uobjs), len(uimgs)
     use_trial_samples, summary, image_summary = trial_logicals(trials, meta)
-    dprime_maxval = 5
-    # if use_trial_samples:
-    #     dprime_maxval = 10
+    if use_trial_samples:
+        dprime_maxval = 5
+    else:
+        dprime_maxval = 20
     
     rec = {}
     if compute_O:

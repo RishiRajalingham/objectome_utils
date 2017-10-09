@@ -11,11 +11,13 @@ import dldata.metrics.utils as utils
 import dldata.metrics.classifier as dldat_cls
 import objectome_utils as obj
 import sys
+import os
 
+NPC_TRAIN = 20 
 OPT_DEFAULT = {
     'classifiertype': 'svm',
     # 'classifiertype': 'softmax',
-    'npc_train': 50,
+    'npc_train': NPC_TRAIN,
     'npc_test': 50,
     'n_splits': 10,
     'train_q': {},
@@ -56,21 +58,22 @@ imgids = pk.load(open(img_sample_fn, 'r'))
 meta_id_list = list(meta['id'])
 im240 = [meta_id_list.index(ii) for ii in imgids]
 
-def get_opt(imgset, modelname):
+def get_opt(imgset, modelname, clstype='svm'):
     opt = copy.deepcopy(OPT_DEFAULT)
+    opt['classifiertype'] = clstype
     opt['model_spec'] = modelname
     if imgset in ['im240', 'im240/']:
         opt['train_q'] = lambda x: (x['id'] not in set(imgids))
         opt['test_q'] = lambda x: (x['id'] in set(imgids))
-        opt['n_splits'] = 100
-        opt['npc_train'] = 50
+        opt['n_splits'] = 10
+        opt['npc_train'] = NPC_TRAIN
         opt['npc_test'] = 10
     elif imgset in ['im2400', 'im2400/']:
         opt['train_q'] = {}
         opt['test_q'] = {}
-        opt['n_splits'] = 20
-        opt['npc_train'] = 50
-        opt['npc_test'] = 50
+        opt['n_splits'] = 10
+        opt['npc_train'] = NPC_TRAIN
+        opt['npc_test'] = 100 - NPC_TRAIN
     return  opt
 
 def normalize_features(train_features, test_features, labelset, trace_normalize=False):
@@ -144,17 +147,22 @@ def main(argv):
     #print 'RUNNING: ' +argv
     modelname = argv[0]
     imgset = argv[1]
+    clstype = argv[2]
     if imgset[-1] != '/':
         imgset = imgset + '/'
-    opt = get_opt(imgset, modelname)
+    opt = get_opt(imgset, modelname, clstype)
 
     feature_fn = feature_path + modelname + '.npy'
+    if not os.path.isfile(feature_fn):
+        print 'Feature not found: ' + feature_fn
+        return
     features = np.load(feature_fn)
     meta = obj.objectome24_meta()
-    outfn = trial_path + imgset + modelname + '_multicls' + opt['classifiertype'] + '.pkl' 
-    multiclass_classification(features, meta, opt, outfn=outfn)
+    outfn = trial_path + imgset + modelname + '_multicls' + str(NPC_TRAIN) + opt['classifiertype'] + '.pkl' 
+    trials = multiclass_classification(features, meta, opt, outfn=outfn)
+    print modelname, trials['prob_choice'].astype('double').mean()
     return
 
 if __name__ == "__main__":
    main(sys.argv[1:])
-   # modelname im2400 True
+   # modelname im2400 svm

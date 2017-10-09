@@ -5,7 +5,6 @@ all_models = [
 'GOOGLENETv3_seed0mdl_mixed_35x35x288b_pca',
 'GOOGLENETv3_seed0mdl_mixed_17x17x768b_pca',
 'GOOGLENETv3_seed1mdl_logits_pca',
-'GOOGLENETv3_seed0mdl_flattened_last_mixed_pca',
 'GOOGLENETv3_seed0mdl_mixed_8x8x2048b_pca',
 'GOOGLENETv3_seed2mdl_mixed_8x8x2048a_pca',
 'GOOGLENETv3_seed1mdl_mixed_17x17x1280a_pca',
@@ -14,12 +13,10 @@ all_models = [
 'GOOGLENETv3_seed2mdl_logits_pca',
 'GOOGLENETv3_seed0mdl_mixed_17x17x768a_pca',
 'GOOGLENETv3_seed0mdl_mixed_17x17x1280a_pca',
-'GOOGLENETv3_seed1mdl_flattened_last_mixed_pca',
 'GOOGLENETv3_seed2mdl_mixed_8x8x2048b_pca',
 'GOOGLENETv3_seed1mdl_mixed_35x35x288b_pca',
 'GOOGLENETv3_seed2mdl_mixed_35x35x256a_pca',
 'GOOGLENETv3_seed2mdl_mixed_35x35x288b_pca',
-'GOOGLENETv3_seed2mdl_flattened_last_mixed_pca',
 'GOOGLENETv3_seed0mdl_mixed_35x35x256a_pca',
 'GOOGLENETv3_seed0mdl_logits_pca',
 'GOOGLENETv3_seed0mdl_mixed_8x8x2048a_pca',
@@ -74,6 +71,7 @@ all_models = [
 'GOOGLENETv3_seed2mdl_flattened_last_mixed',
 'GOOGLENETv3_seed3mdl_flattened_last_mixed',
 'GOOGLENETv3_seed1mdl_flattened_last_mixed',
+#'V1_pca',
 'V1',
 'HMAX',
 'VGG_fc6',
@@ -273,3 +271,12 @@ def get_subject_list_meta(ignore_hum_subs=None, ignore_monk_subs=None):
             monk_subpool_list_meta.append([nsubs, sub])
 
     return hum_subpool_list_meta, monk_subpool_list_meta
+
+def get_model_subject_list_meta():
+	gnet_subpool_list_meta = []
+	for sub in all_models:
+		if ('GOOGLENETv3_seed' in sub) and ('mdl_flattened_last_mixed' in sub) and ('pca' not in sub):
+			nsubs = len(sub) - len('GOOGLENETv3_seed') - len('mdl_flattened_last_mixed')
+			gnet_subpool_list_meta.append([nsubs, sub])
+	return gnet_subpool_list_meta
+

@@ -84,6 +84,18 @@ def get_lin_variance_explained(x,y1,y2):
     
     return np.nanmean([rho1, rho2])**2 / (ic1*ic2)
     
+
+def get_lin_variance_explained_v2(x1,x2,y1,y2):
+    z1,yy2 = obj.lin_predict_cv(x1,y1,y2)
+    z2,yy1 = obj.lin_predict_cv(x2,y2,y1)
+    
+    ic1 = obj.nnan_consistency(yy1, yy2)
+    ic2 = obj.nnan_consistency(z1, z2)
+    rho1 = obj.nnan_consistency(yy1, z2)
+    rho2 = obj.nnan_consistency(yy2, z1)
+    
+    return np.nanmean([rho1, rho2])**2 / (ic1*ic2)
+    
 def unique_lin_variance(x,y1,y2,fi):
     varexp_all = get_lin_variance_explained(x,y1,y2)
     x2 = deepcopy(x)

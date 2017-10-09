@@ -110,7 +110,8 @@ class psychophysDatasetObject(object):
 def get_monkeyturk_data(dataset='objectome24'):
     if dataset == 'objectome24':
         meta_path = obj.dicarlolab_homepath + 'stimuli/objectome24s100/metadata.pkl'
-        data_path = obj.dicarlolab_homepath + 'monkeyturk/allData_v2.mat'
+        # data_path = obj.dicarlolab_homepath + 'monkeyturk/allData_v2.mat'
+        data_path = obj.dicarlolab_homepath + 'monkeyturk/allData_v3.mat'
     
     meta = pk.load(open(meta_path,'r'))
     datmat = io.loadmat(data_path)
