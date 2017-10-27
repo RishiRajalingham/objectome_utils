@@ -148,8 +148,8 @@ def translate_images(images):
         images_shifted.append(im)
     return images_shifted
 
-def run_model(stimpath, cnn_oi='VGG_S', run_token=False):
-    meta = pk.load(open(stimpath + 'metadata.pkl'))
+def run_model(stimpath, cnn_oi='VGG_S', metafn='metadata.pkl', run_token=False):
+    meta = pk.load(open(stimpath + metafn))
     if run_token:
         filelist = glob.glob(stimpath + 'labels/*.png')
     else:
@@ -215,9 +215,9 @@ def format_features(stimpath, nreps=9):
     # Main
 
 
-import objectome_utils as obj
-meta = obj.objectome24_meta()
-uobj = list(set(meta['obj']))
+# import objectome_utils as obj
+# meta = obj.objectome24_meta()
+# uobj = list(set(meta['obj']))
 
 #stimpath = STIMPATH_OBJ
 #filelist = glob.glob(stimpath + 'labels/*.png')
@@ -233,8 +233,8 @@ uobj = list(set(meta['obj']))
 #    for layer in features_perlayer:
 #        token_features[mod + layer] = features_perlayer[layer][ind,:]
 
-def run_one(stimpath, cnn_oi):
-    features_perlayer, meta, output_path = run_model(stimpath=stimpath, cnn_oi=cnn_oi)
+def run_one(stimpath, cnn_oi, metafn='metadata.pkl'):
+    features_perlayer, meta, output_path = run_model(stimpath=stimpath, cnn_oi=cnn_oi, metafn=metafn)
     save_features(features_perlayer, meta, cnn_oi, output_path, repindex=None)
 
 # for rep in range(9):
@@ -256,7 +256,7 @@ def run_one(stimpath, cnn_oi):
 # run_one(stimpath=STIMPATH_OBJ_ALPHA, cnn_oi='GoogLeNet')
 # run_one(stimpath=STIMPATH_OBJ_ALPHA, cnn_oi='GoogLeNet')
 # run_one(stimpath=STIMPATH_OBJ_ALPHA, cnn_oi='ResNet')
-
-run_one(stimpath=STIMPATH_OBJ, cnn_oi='DenseNet')
+STIMPATH_HVM_TRAINTEST = '/mindhive/dicarlolab/u/rishir/stimuli_genthor/hvm10_traintest_all/'
+run_one(stimpath=STIMPATH_HVM_TRAINTEST, cnn_oi='AlexNet', metafn='metadata0.pkl')
 
 

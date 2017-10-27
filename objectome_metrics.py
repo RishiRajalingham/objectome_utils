@@ -68,7 +68,12 @@ def get_object_c2x2(trials, summary, obj_i, obj_j=None, use_trial_samples=False)
         Di = np.logical_and(Di, summary[obj_j]['sam'])
 
     if use_trial_samples:
-        Ci = summary[obj_i]['choice']
+        if 'choice' in summary[obj_i]:
+            Ci = summary[obj_i]['choice']   
+        else:
+            ch_ = [d > 0.5 for d in dat['prob_choice'].astype('double')]
+            Ci = (summary[0]['sam'] & ch_) | (summary[0]['dist'] & np.logical_not(ch_))
+            
         return get_c2x2_from_logicals(Si, Di, Ci=Ci)
     else:
         return get_c2x2_from_logicals(Si, Di, trials=trials)
