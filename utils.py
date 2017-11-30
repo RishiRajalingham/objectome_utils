@@ -1,6 +1,7 @@
 import numpy as np 
 import scipy as sp
 from scipy import stats, linalg
+from copy import deepcopy
 """ General purpose utils """
 
 def nanzscore(x, mean_only=False):
@@ -63,18 +64,48 @@ def get_quat_diff(q, q0):
     return np.arccos(abs(dot))
 
 """ Linear reg - variance explained functions"""
-from sklearn import linear_model
 import objectome_utils as obj 
 from copy import deepcopy
+from sklearn import linear_model
 
-def lin_predict_cv(x, y1, y2):
-    t = np.squeeze(np.isfinite(y1))
-    x = np.squeeze(x[t,:])
-    y1 = np.squeeze(y1[t,:])
-    y2 = np.squeeze(y2[t,:])
+
+def lin_predict(x,y):
+    tnan = [t for t in range(len(y)) if (np.isfinite(x[t]) and np.isfinite(y[t]))]
     regr = linear_model.LinearRegression()
-    regr.fit(x,y1)
-    return regr.predict(x), y2
+    regr.fit(x[tnan],y[tnan])
+    y_pred = deepcopy(y)
+    y_pred[tnan] = regr.predict(x[tnan])
+    out = {}
+    out['y_pred'] = y_pred
+    out['res'] = y - y_pred
+    out['model'] = regr
+    return out
+
+def lin_predict_cv(x1, x2, y1, y2):
+    out1 = lin_predict(x1,y1)
+    out2 = lin_predict(x2,y2)
+
+    out = {}
+    ic_a = obj.nnan_consistency(x1, x2)
+    ic_b = obj.nnan_consistency(y1, y2)
+    rho = []
+    rho.append(obj.nnan_consistency(y1, out2['y_pred']))
+    rho.append(obj.nnan_consistency(y2, out1['y_pred']))
+    out['IC_a'] = ic_a
+    out['IC_b'] = ic_b
+    out['rho'] = np.nanmean(rho)
+    out['rho_n'] = np.nanmean(rho) / ((ic_a*ic_b)**0.5)
+    out['rho_n_sq'] = np.nanmean(rho)**2 / ((ic_a*ic_b))    
+    return out
+
+# def lin_predict_cv(x, y1, y2):
+#     t = np.squeeze(np.isfinite(y1))
+#     x = np.squeeze(x[t,:])
+#     y1 = np.squeeze(y1[t,:])
+#     y2 = np.squeeze(y2[t,:])
+#     regr = linear_model.LinearRegression()
+#     regr.fit(x,y1)
+#     return regr.predict(x), y2
 
 def get_lin_variance_explained(x,y1,y2):
     z1,yy2 = lin_predict_cv(x,y1,y2)

@@ -15,7 +15,7 @@ import os
 
 NPC_TRAIN = 20 
 OPT_DEFAULT = {
-    'classifiertype': 'svm',
+    'classifiertype': 'softmax',
     # 'classifiertype': 'softmax',
     'npc_train': NPC_TRAIN,
     'npc_test': 50,

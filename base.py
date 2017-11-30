@@ -85,8 +85,16 @@ HVM_10 = [ 'bear', 'ELEPHANT_M', '_18', 'face0001', 'alfa155', 'breed_pug', 'TUR
 #bear, elephant, table, face, 
 #HVM new (6): car, dog, turtle, apple, chair, plane 
 
-HVM_10_texturefree = [ '001_POV_geom_tf','alfa155_POV_geom_tf',  'bear_POV_geom_tf', 'ELEPHANT_M_POV_geom_tf', 'face0001_tf', 
-    '01_Airliner_2jetEngines_POV_geom_tf', 'Apple_Fruit_obj_POV_geom_tf', 'breed_pug_POV_geom_tf', 'f16_POV_geom_tf', 'TURTLE_L_POV_geom_tf']
+HVM_10_texturefree = ['bear_POV_geom_tf',
+ 'ELEPHANT_M_POV_geom_tf',
+ '18_POV_geom_tf',
+ 'face0001_tf',
+ 'alfa155_POV_geom_tf',
+ 'breed_pug_POV_geom_tf',
+ 'TURTLE_L_POV_geom_tf',
+ 'Apple_Fruit_obj_POV_geom_tf',
+ 'f16_POV_geom_tf',
+ '001_POV_geom_tf']
 
 
 SYMBOLS_alpharoman = ['Letter_A', 'Letter_B', 'Letter_C', 'Letter_D', 'Letter_E','Letter_F', 'Letter_G', 'Letter_H', 'Letter_I', 'Letter_J',

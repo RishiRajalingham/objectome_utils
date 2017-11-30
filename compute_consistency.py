@@ -130,6 +130,33 @@ def compute_consistency_stats(target='Human Pool', corrtype='pearson', ignore_mo
     print 'Done consistency stats: ', target, corrtype, outfn
     return stats
 
-reload_only = None #['V1_multiclssoftmax']
-compute_consistency_stats(corrtype='pearson', reload_only=reload_only)
-compute_consistency_stats(corrtype='spearman', reload_only=reload_only)
+def get_residual_to_target(all_metrics, compare_models=None, target='Human Pool', metricn='I1_dprime_C2400'):
+    stats = {}
+    if compare_models is None:
+        compare_models = [m for m in all_metrics.keys()]
+    for model_fn in compare_models:
+        if all_metrics[model_fn] == []:
+            stats[model_fn] = []
+         elif all_metrics[model_fn][metricn] == []:
+            stats[model_fn] = []
+        else:
+            try:
+                out = obj.pairwise_consistency(all_metrics[target], all_metrics[model_fn], metricn=metricn, corrtype=corrtype)  
+                stats[model_fn] = {
+                    'beh': obj.get_mean_behavior(all_metrics[model_fn], metricn),
+                    'beh_sample': all_metrics[model_fn][metricn][0],
+                    'cons':np.nanmean(out[conscorrtype]),
+                    'cons_all':np.array(out[conscorrtype]),
+                    'cons_sig':np.nanstd(out[conscorrtype]),
+                    'IC_b':np.nanmean(out['IC_b']),
+                    'IC_b_sig':np.nanstd(out['IC_b']),
+               }
+            except:
+                print 'Failed to compute consistency?? ' + model_fn + ' : ' + metricn
+    return stats
+
+    
+
+# reload_only = None #['V1_multiclssoftmax']
+# compute_consistency_stats(corrtype='pearson', reload_only=reload_only)
+# compute_consistency_stats(corrtype='spearman', reload_only=reload_only)

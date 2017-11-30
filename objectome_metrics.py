@@ -264,10 +264,10 @@ def pairwise_consistency(A, B, metricn='I1_dprime_C', corrtype='pearson', img_su
         out['IC_a'].append(ic_a)
         out['IC_b'].append(ic_b)
         rho_tmp = []
-        rho_tmp.append(nnan_consistency(a0, b0, corrtype=corrtype, ignore_vals=ignore_vals))
+        # hard enforce that correlations are always across different trial splits (e.g. 0-1, never 0-0)
+        # in case consistency is used on residuals (where trial data may be shared across A and B).
         rho_tmp.append(nnan_consistency(a1, b0, corrtype=corrtype, ignore_vals=ignore_vals))
         rho_tmp.append(nnan_consistency(a0, b1, corrtype=corrtype, ignore_vals=ignore_vals))
-        rho_tmp.append(nnan_consistency(a1, b1, corrtype=corrtype, ignore_vals=ignore_vals))        
         out['rho'].append(np.mean(rho_tmp))
         out['rho_n'].append(np.mean(rho_tmp) / ((ic_a*ic_b)**0.5))
         out['rho_n_sq'].append(np.mean(rho_tmp)**2 / ((ic_a*ic_b)))
