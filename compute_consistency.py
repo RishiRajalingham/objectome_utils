@@ -137,7 +137,7 @@ def get_residual_to_target(all_metrics, compare_models=None, target='Human Pool'
     for model_fn in compare_models:
         if all_metrics[model_fn] == []:
             stats[model_fn] = []
-         elif all_metrics[model_fn][metricn] == []:
+        elif all_metrics[model_fn][metricn] == []:
             stats[model_fn] = []
         else:
             try:
@@ -157,6 +157,6 @@ def get_residual_to_target(all_metrics, compare_models=None, target='Human Pool'
 
     
 
-# reload_only = None #['V1_multiclssoftmax']
-# compute_consistency_stats(corrtype='pearson', reload_only=reload_only)
-# compute_consistency_stats(corrtype='spearman', reload_only=reload_only)
+reload_only = None #['V1_multiclssoftmax']
+compute_consistency_stats(corrtype='pearson', reload_only=reload_only)
+compute_consistency_stats(corrtype='spearman', reload_only=reload_only)

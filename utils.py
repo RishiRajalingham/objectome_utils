@@ -70,11 +70,12 @@ from sklearn import linear_model
 
 
 def lin_predict(x,y):
-    tnan = [t for t in range(len(y)) if (np.isfinite(x[t]) and np.isfinite(y[t]))]
+    x_mu = np.mean(x, axis=1)
+    tnan = [t for t in range(len(y)) if (np.isfinite(x_mu[t]) and np.isfinite(y[t]))]
     regr = linear_model.LinearRegression()
     regr.fit(x[tnan],y[tnan])
     y_pred = deepcopy(y)
-    y_pred[tnan] = regr.predict(x[tnan])
+    y_pred[tnan] = regr.predict(x[tnan,:])
     out = {}
     out['y_pred'] = y_pred
     out['res'] = y - y_pred

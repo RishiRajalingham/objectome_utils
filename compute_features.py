@@ -17,6 +17,8 @@ STIMPATH_HVM = '/mindhive/dicarlolab/u/rishir/stimuli/hvm/'
 STIMPATH_HVMRET = '/mindhive/dicarlolab/u/rishir/stimuli/hvmret/'
 STIMPATH_OBJ = '/mindhive/dicarlolab/u/rishir/stimuli/objectome64s100/'
 
+
+
 STIMPATH_OBJ_ALPHA = '/mindhive/dicarlolab/u/rishir/stimuli/objectome64alpha_5/'
 STIMPATH_OBJNOBG = '/mindhive/dicarlolab/u/rishir/stimuli/objectome64s100nobg/'
 STIMPATH_OBJRET = '/mindhive/dicarlolab/u/rishir/stimuli/objectome64s100ret/'
@@ -34,10 +36,18 @@ layers_oi = {
     'VGG_S':            {'fc6', 'fc7', 'fc8'}, 
     'caffe_reference':  {'fc6', 'fc7', 'fc8'}, 
     'AlexNet': {'fc6', 'fc7', 'fc8'}, 
+    'AlexNet_Places': {'fc6', 'fc7'}, 
     'GoogLeNet':        {'pool5/7x7_s1'},
+    'GoogLeNet_Places':        {'pool5/7x7_s1'},
     'ResNet': {'fc1000'},
+    'ResNet_Hybrid': {'pool5'},
+
     'DenseNet': {'pool5', 'fc6'}
 }
+
+
+imagenet_mean = np.load(caffe_root + 'python/caffe/imagenet/ilsvrc_2012_mean.npy')
+places_mean = np.load('/om/user/rishir/caffe/models/places_mean.npy')
 
 def save_features(features_perlayer, meta, cnn_oi, output_path, repindex=None):
     layers = features_perlayer.keys()
@@ -95,6 +105,20 @@ def get_net(stimpath, cnn_oi='VGG_S'):
         model_input = caffe_root + 'models/bvlc_alexnet'
         channel_order = (2,1,0) # the reference model has channels in BGR order instead of RGB
         output_path = stimpath + 'alexnet_features/'
+    elif cnn_oi == 'AlexNet_Places':
+        input_size = 227
+        proto_file = '/om/user/rishir/caffe/models/AlexNet_Places/deploy_alexnet_places365.prototxt'
+        model_file = '/om/user/rishir/caffe/models/AlexNet_Places/alexnet_places365.caffemodel'
+        model_input = '/om/user/rishir/caffe/models/AlexNet_Places/'
+        channel_order = (2,1,0) # the reference model has channels in BGR order instead of RGB
+        output_path = stimpath + 'alexnetPL_features/'
+    elif cnn_oi == 'GoogLeNet_Places':
+        input_size = 224
+        proto_file = '/om/user/rishir/caffe/models/GoogleNetPlaces/deploy_googlenet_places365.prototxt'
+        model_file = '/om/user/rishir/caffe/models/GoogleNetPlaces/googlenet_places365.caffemodel'
+        model_input = '/om/user/rishir/caffe/models/GoogleNetPlaces/'
+        channel_order = (2,1,0) # the reference model has channels in BGR order instead of RGB
+        output_path = stimpath + 'googlenetPL_features/'
     elif cnn_oi == 'ResNet':
         input_size = 224
         # proto_file = caffe_root + 'models/ResNet-152/ResNet-152-deploy.prototxt'
@@ -104,15 +128,24 @@ def get_net(stimpath, cnn_oi='VGG_S'):
         model_file = '/om/user/rishir/caffe/models/ResNet-50/ResNet-50-model.caffemodel'
         model_input = '/om/user/rishir/caffe/models/ResNet-50'
         channel_order = (2,1,0) # the reference model has channels in BGR order instead of RGB
-        output_path = stimpath + 'resnet152_features/'
+        output_path = stimpath + 'resnet50_features/'
+    elif cnn_oi == 'ResNet_Hybrid':
+        input_size = 224
+        proto_file = '/om/user/rishir/caffe/models/resnet_hybrid/deploy_resnet152_hybrid1365.prototxt'
+        model_file = '/om/user/rishir/caffe/models/resnet_hybrid/resnet152_hybrid1365.caffemodel'
+        model_input = '/om/user/rishir/caffe/models/resnet_hybrid'
+        channel_order = (2,1,0) # the reference model has channels in BGR order instead of RGB
+        output_path = stimpath + 'resnet152hybrid_features/'
     elif cnn_oi == 'DenseNet':
         proto_file = '/om/user/rishir/caffe/models/DenseNet-Caffe/DenseNet_161.prototxt'
-	model_file = '/om/user/rishir/caffe/models/DenseNet-Caffe/DenseNet_161.caffemodel'
-	model_input = '/om/user/rishir/caffe/models/DenseNet-Caffe'
-	channel_order = (2,1,0)
-	output_path = stimpath + 'densenet161_features'
+        model_file = '/om/user/rishir/caffe/models/DenseNet-Caffe/DenseNet_161.caffemodel'
+        model_input = '/om/user/rishir/caffe/models/DenseNet-Caffe'
+        channel_order = (2,1,0)
+        output_path = stimpath + 'densenet161_features'
+
     sys.path.insert(0, caffe_root + 'python')
     model_call = '/om/user/shayo/caffe/caffe/scripts/download_model_binary.py ' + model_input
+    
     if not os.path.isfile(model_file):
         print("Model file is missing")
         get_ipython().system(model_call)
@@ -127,7 +160,8 @@ def get_net(stimpath, cnn_oi='VGG_S'):
     # Preprocess input data
     transformer = caffe.io.Transformer({'data': net.blobs['data'].data.shape})
     transformer.set_transpose('data', (2,0,1))
-    transformer.set_mean('data', np.load(caffe_root + 'python/caffe/imagenet/ilsvrc_2012_mean.npy').mean(1).mean(1)) # mean pixel
+    # transformer.set_mean('data', imagenet_mean.mean(1).mean(1)) # mean pixel # rishir
+    transformer.set_mean('data', places_mean.mean(1).mean(1)) # mean pixel
     transformer.set_raw_scale('data', 255)  # the reference model operates on images in [0,255] range instead of [0,1]
     transformer.set_channel_swap('data', channel_order)  
 
@@ -215,48 +249,20 @@ def format_features(stimpath, nreps=9):
     # Main
 
 
-# import objectome_utils as obj
-# meta = obj.objectome24_meta()
-# uobj = list(set(meta['obj']))
-
-#stimpath = STIMPATH_OBJ
-#filelist = glob.glob(stimpath + 'labels/*.png')
-#ind = [np.nonzero([uobj[i] in f for f in filelist])[0][0] for i in range(len(uobj))]
-
-#token_features = {}
-#token_features['obj'] = uobj
-
-#models = ['AlexNet', 'VGG_S', 'GoogLeNet']
-#models = ['DenseNet']
-#for mod in models:
-#    features_perlayer, meta, output_path = run_model(stimpath, cnn_oi=mod, run_token=True)
-#    for layer in features_perlayer:
-#        token_features[mod + layer] = features_perlayer[layer][ind,:]
 
 def run_one(stimpath, cnn_oi, metafn='metadata.pkl'):
     features_perlayer, meta, output_path = run_model(stimpath=stimpath, cnn_oi=cnn_oi, metafn=metafn)
     save_features(features_perlayer, meta, cnn_oi, output_path, repindex=None)
 
-# for rep in range(9):
-#     cnn_oi = 'caffe_reference'
-#     features_perlayer, meta, output_path = run_model(stimpath=STIMPATH, cnn_oi=cnn_oi)
-#     save_features(features_perlayer, meta, cnn_oi, output_path, rep)
 
-#     cnn_oi = 'VGG_S'
-#     features_perlayer, meta, output_path = run_model(stimpath=STIMPATH, cnn_oi=cnn_oi)
-#     save_features(features_perlayer, meta, cnn_oi, output_path, rep)
+stimpaths = [
+'/mindhive/dicarlolab/u/rishir/stimuli_genthor/hvm10TF_traintest_all/',
+'/mindhive/dicarlolab/u/rishir/stimuli_genthor/hvm10TF_traintest_all2/',
+'/mindhive/dicarlolab/u/rishir/stimuli_genthor/hvm10TF_traintest_all3/'
+]
+cnn_oi = 'GoogLeNet'
+for stimpath in stimpaths:
+    run_one(stimpath, cnn_oi)
 
-# def run_one(stimpath, cnn_oi):
-#     features_perlayer, meta, output_path = run_model(stimpath=stimpath, cnn_oi=cnn_oi)
-#     save_features(features_perlayer, meta, cnn_oi, output_path, repindex=None)
-
-# def run_token(stimpath, cnn_oi):
-#     features_perlayer, meta, output_path = run_model(stimpath=stimpath, cnn_oi=cnn_oi)
-
-# run_one(stimpath=STIMPATH_OBJ_ALPHA, cnn_oi='GoogLeNet')
-# run_one(stimpath=STIMPATH_OBJ_ALPHA, cnn_oi='GoogLeNet')
-# run_one(stimpath=STIMPATH_OBJ_ALPHA, cnn_oi='ResNet')
-STIMPATH_HVM_TRAINTEST = '/mindhive/dicarlolab/u/rishir/stimuli_genthor/hvm10_traintest_all/'
-run_one(stimpath=STIMPATH_HVM_TRAINTEST, cnn_oi='AlexNet', metafn='metadata0.pkl')
 
 

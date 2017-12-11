@@ -102,6 +102,7 @@ def multiclass_rec_to_trials(rec, features, meta):
 
         test_features = normalize_features(train_features, test_features, labelset)
         proba = model.predict_proba(test_features)
+        score = model.decision_function(test_features)
 
         for i,ii in enumerate(test):
             imgid = meta[ii]['id']
@@ -114,11 +115,12 @@ def multiclass_rec_to_trials(rec, features, meta):
                 dist_ind = labelset.index(dist_label)
                 sy = proba[i,dist_ind]
                 prob_val = sx / (sx + sy)
-                rec_curr = (true_label,) + (dist_label,) + (prob_val,) + (imgid,) + ('',) + ('',) 
+                dec_score = score[i,dist_ind] 
+                rec_curr = (true_label,) + (dist_label,) + (prob_val,) + (imgid,) + ('',) + ('',) + (dec_score, )
                 trial_records.append(rec_curr)
             
-    KW_NAMES = ['sample_obj', 'dist_obj', 'prob_choice', 'id', 'WorkerID', 'AssignmentID']
-    KW_FORMATS = ['|S40','|S40','|S40','|S40','|S40','|S40']
+    KW_NAMES = ['sample_obj', 'dist_obj', 'prob_choice', 'id', 'WorkerID', 'AssignmentID', 'DecisionScore']
+    KW_FORMATS = ['|S40','|S40','|S40','|S40','|S40','|S40', '|S40']
     return tb.tabarray(records=trial_records, names=KW_NAMES, formats=KW_FORMATS)
 
 def multiclass_classification(features, meta, opt, outfn=None):

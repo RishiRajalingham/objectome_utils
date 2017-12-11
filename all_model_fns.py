@@ -71,6 +71,11 @@ all_models = [
 'GOOGLENETv3_seed2mdl_flattened_last_mixed',
 'GOOGLENETv3_seed3mdl_flattened_last_mixed',
 'GOOGLENETv3_seed1mdl_flattened_last_mixed',
+'GOOGLENETv3_retina_seed0mdl_flattened_last_mixed',
+'GOOGLENETv3_retina_seed1mdl_flattened_last_mixed',
+'GOOGLENETv3_retina_seed2mdl_flattened_last_mixed',
+'GOOGLENETv3_retina_seed3mdl_flattened_last_mixed',
+'GOOGLENETv3_retina_seed4mdl_flattened_last_mixed',
 #'V1_pca',
 'V1',
 'HMAX',
@@ -84,7 +89,6 @@ all_models = [
 'GOOGLENET_pool5',
 'RESNET101_conv5',
 'GOOGLENETv3_mdl_flattened_last_mixed',
-'GOOGLENETv3_retina_mdl_flattened_last_mixed',
 'GOOGLENETv3_synth34000__mdl_flattened_last_mixed']
 
 all_subjects = [
