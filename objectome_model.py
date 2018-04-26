@@ -123,6 +123,46 @@ def multiclass_rec_to_trials(rec, features, meta):
     KW_FORMATS = ['|S40','|S40','|S40','|S40','|S40','|S40', '|S40']
     return tb.tabarray(records=trial_records, names=KW_NAMES, formats=KW_FORMATS)
 
+
+def multiclass_rec_to_trials_heldout_features(rec, features_base, meta, features_test_list):
+    trial_records_col = []
+    for feat_i, features_test in enumerate(features_test_list):
+
+        trial_records = []
+        for s_i, s_res in enumerate(rec['split_results']):
+            train = rec['splits'][0][s_i]['train']
+            test = rec['splits'][0][s_i]['test']
+            train_features = features_base[train,:]
+            test_features = features_test[test,:]
+            
+            labelset = list(s_res['labelset'])
+            model = s_res['model']
+
+            test_features = normalize_features(train_features, test_features, labelset)
+            proba = model.predict_proba(test_features)
+            score = model.decision_function(test_features)
+
+            for i,ii in enumerate(test):
+                imgid = meta[ii]['id']
+                true_label = meta[ii]['obj']
+                true_ind = labelset.index(true_label)
+                sx = proba[i,true_ind]
+                for dist_label in labelset:
+                    if dist_label == true_label:
+                        continue
+                    dist_ind = labelset.index(dist_label)
+                    sy = proba[i,dist_ind]
+                    prob_val = sx / (sx + sy)
+                    dec_score = score[i,dist_ind] 
+                    rec_curr = (true_label,) + (dist_label,) + (prob_val,) + (imgid,) + ('',) + ('',) + (dec_score, )
+                    trial_records.append(rec_curr)
+                
+        KW_NAMES = ['sample_obj', 'dist_obj', 'prob_choice', 'id', 'WorkerID', 'AssignmentID', 'DecisionScore']
+        KW_FORMATS = ['|S40','|S40','|S40','|S40','|S40','|S40', '|S40']
+        tmp = tb.tabarray(records=trial_records, names=KW_NAMES, formats=KW_FORMATS)
+        trial_records_col.append(tmp)
+    return trial_records_col
+
 def multiclass_classification(features, meta, opt, outfn=None):
     evalc = {'ctypes': [('dp_standard', 'dp_standard', {'kwargs': {'error': 'std'}})],
              'labelfunc': 'obj',
@@ -143,6 +183,8 @@ def multiclass_classification(features, meta, opt, outfn=None):
     if outfn is not None:
         pk.dump(trials, open(outfn, 'wb'))
     return trials
+
+
 
 def main(argv):
     """" Input args : modelname imgset (no file/directory extensions)"""

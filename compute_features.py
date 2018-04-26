@@ -256,9 +256,10 @@ def run_one(stimpath, cnn_oi, metafn='metadata.pkl'):
 
 
 stimpaths = [
-'/mindhive/dicarlolab/u/rishir/stimuli_genthor/hvm10TF_traintest_all/',
-'/mindhive/dicarlolab/u/rishir/stimuli_genthor/hvm10TF_traintest_all2/',
-'/mindhive/dicarlolab/u/rishir/stimuli_genthor/hvm10TF_traintest_all3/'
+# '/mindhive/dicarlolab/u/rishir/stimuli_genthor/hvm10TF_traintest_all/',
+# '/mindhive/dicarlolab/u/rishir/stimuli_genthor/hvm10TF_traintest_all2/',
+# '/mindhive/dicarlolab/u/rishir/stimuli_genthor/hvm10TF_traintest_all3/'
+'/mindhive/dicarlolab/u/rishir/stimuli_genthor/hvm10TF_traintest_all4/'
 ]
 cnn_oi = 'GoogLeNet'
 for stimpath in stimpaths:

@@ -157,6 +157,7 @@ def get_residual_to_target(all_metrics, compare_models=None, target='Human Pool'
 
     
 
-reload_only = None #['V1_multiclssoftmax']
+reload_only = ['PXL_multicls20softmax']
 compute_consistency_stats(corrtype='pearson', reload_only=reload_only)
-compute_consistency_stats(corrtype='spearman', reload_only=reload_only)
+#compute_consistency_stats(corrtype='spearman', reload_only=reload_only)
+#
