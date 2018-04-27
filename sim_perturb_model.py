@@ -206,8 +206,11 @@ def silencing_exp_per_sigma(data, sigma, nfeat_sample=1000, sil_layer='fc6', sil
     trials_base = om.multiclass_rec_to_trials(rec, features_base, meta)
     metric_base, del_base, del_rel_base = get_metric_subsampled_tasks(trials_base, meta, subsampled_tasks=SUBSAMPLED_TASKS)
 
+    perf_baseline = obj.get_mean_behavior(metric_base, metricn='O2_dprime')
+    mu_baseline, spi_baseline = get_mu_sparse(perf_baseline)
+
     DATA, STATS_1D = [],[]
-    STATS_1D_fn = ['perc_del', 'sigma', 'x', 'y', 'mu_d', 'mu_dr', 'spi_d', 'spi_dr']
+    STATS_1D_fn = ['perc_del', 'sigma', 'x', 'y', 'mu_d', 'mu_dr', 'spi_d', 'spi_dr', 'mu_dp0', 'spi_d0']
 
     for i in range(nsil_per_level):
         if sil_layer == 'fc6':
@@ -231,38 +234,49 @@ def silencing_exp_per_sigma(data, sigma, nfeat_sample=1000, sil_layer='fc6', sil
         'O2_dprime_rel':delta_s_rel['O2_dprime'],
         }
 
+        dp0 = obj.get_mean_behavior(metric_s, metricn='O2_dprime')
         d = obj.get_mean_behavior(delta_s, metricn='O2_dprime')
         d_rel = obj.get_mean_behavior(delta_s_rel, metricn='O2_dprime')
 
+        mu_d0, spi_d0 = get_mu_sparse(d)
         mu_d, spi_d = get_mu_sparse(d)
         mu_dr, spi_dr = get_mu_sparse(d_rel)
     
         DATA.append(tmp)
-        STATS_1D.append([perc_del, sigma, xy[0], xy[1], mu_d, mu_dr, spi_d, spi_dr])
+        STATS_1D.append([perc_del, sigma, xy[0], xy[1], mu_d, mu_dr, spi_d, spi_dr, mu_d0, spi_d0])
 
     STATS_2D, STATS_2D_fn = stats_over_exp(DATA, STATS_1D)
-
-    return DATA, STATS_1D, STATS_2D, STATS_1D_fn, STATS_2D_fn
+    STATS_0D = {
+        'mu_baseline':mu_baseline,
+        'spi_baseline':spi_baseline
+    }
+    return DATA, STATS_1D, STATS_2D, STATS_1D_fn, STATS_2D_fn, STATS_0D
 
 
 def run_model(model_fn, sil_layer='fc6', shuf_tissue_xy=False, nfeat_sample=1000, sil_type=1):
 
     data = load_tissue_mapped_models(model_fn)
-
+    ntrial_multiplier = 10.0
+    STATS_0D = []
     STATS_1D = []
     STATS_2D = []
-    for sigma in [1.0, 1.5, 2.0, 3.0, 5.0, 10.0, 20.0, 50.0]:
-        if sigma < 10:
+    for sigma in [1.0, 1.5, 2.0, 3.0, 5.0, 10.0, 20.0, 25.0, 50.0, 100.0]:
+        if sigma < 20.0:
             nsil_per_level = 50
+        elif sigma < 100.0:
+            nsil_per_level = 10
         else:
-            nsil_per_level = 5
-        DATA, STATS_1D_, STATS_2D_, STATS_1D_fn, STATS_2D_fn = silencing_exp_per_sigma(data, sigma, 
+            nsil_per_level = 2
+        # nsil_per_level = int(np.ceil(ntrial_multiplier*(20.0/sigma)**2))
+        DATA, STATS_1D_, STATS_2D_, STATS_1D_fn, STATS_2D_fn, STATS_0D_ = silencing_exp_per_sigma(data, sigma, 
             sil_layer=sil_layer, nfeat_sample=nfeat_sample, sil_type=sil_type, 
             nsil_per_level=nsil_per_level, shuf=shuf_tissue_xy)
-        
+        STATS_0D.extend(STATS_0D_)
         STATS_1D.extend(STATS_1D_)
         STATS_2D.extend(STATS_2D_)
+        
     out = {
+        'STATS_0D': STATS_0D,
         'STATS_1D': STATS_1D,
         'STATS_2D': STATS_2D,
         'STATS_1D_fn': STATS_1D_fn,
