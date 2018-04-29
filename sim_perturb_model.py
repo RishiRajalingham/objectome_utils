@@ -28,9 +28,9 @@ opt['classifiertype'] = 'softmax'
 opt['model_spec'] = 'tissue_mapped'
 opt['train_q'] = lambda x: (x['id'] in set(imgids))
 opt['test_q'] = lambda x: (x['id'] in set(imgids))
-opt['n_splits'] = 10
-opt['npc_train'] = 30
-opt['npc_test'] = 10
+opt['n_splits'] = 20
+opt['npc_train'] = 39
+opt['npc_test'] = 1
 
 evalc = {
     'ctypes': [('dp_standard', 'dp_standard', {'kwargs': {'error': 'std'}})],
@@ -79,12 +79,12 @@ def silence_factor_gaussian(dXY_i, sigma):
 
 def silence_factor_boxcar(dXY_i, sigma):
     supp_factor = np.array([1-int(d < sigma) for d in dXY_i])
-    return supp_factor.astype('double')
+    return supp_factor.astype('single')
 
 def silence_factor_percent(dXY_i, persil):
     thres = np.percentile(dXY_i, persil)
     supp_factor = np.array([1-int(d < thres) for d in dXY_i])
-    return supp_factor.astype('double')
+    return supp_factor.astype('single')
 
 def silence_features_fc6(data, delete_feat_seed=None, sigma=1.0, shuf=False, sil_type=1):
     fc6_s = deepcopy(data['fc6'])
@@ -210,7 +210,7 @@ def silencing_exp_per_sigma(data, sigma, nfeat_sample=1000, sil_layer='fc6', sil
     mu_baseline, spi_baseline = get_mu_sparse(perf_baseline)
 
     DATA, STATS_1D = [],[]
-    STATS_1D_fn = ['perc_del', 'sigma', 'x', 'y', 'mu_d', 'mu_dr', 'spi_d', 'spi_dr', 'mu_dp0', 'spi_d0']
+    STATS_1D_fn = ['perc_del', 'sigma', 'x', 'y', 'mu_d', 'mu_dr', 'spi_d', 'spi_dr', 'mu_dp1', 'spi_d1', 'mu_dp0', 'sp1_d0']
 
     for i in range(nsil_per_level):
         if sil_layer == 'fc6':
@@ -243,14 +243,10 @@ def silencing_exp_per_sigma(data, sigma, nfeat_sample=1000, sil_layer='fc6', sil
         mu_dr, spi_dr = get_mu_sparse(d_rel)
     
         DATA.append(tmp)
-        STATS_1D.append([perc_del, sigma, xy[0], xy[1], mu_d, mu_dr, spi_d, spi_dr, mu_d0, spi_d0])
+        STATS_1D.append([perc_del, sigma, xy[0], xy[1], mu_d, mu_dr, spi_d, spi_dr, mu_d0, spi_d0, mu_baseline, spi_baseline])
 
     STATS_2D, STATS_2D_fn = stats_over_exp(DATA, STATS_1D)
-    STATS_0D = {
-        'mu_baseline':mu_baseline,
-        'spi_baseline':spi_baseline
-    }
-    return DATA, STATS_1D, STATS_2D, STATS_1D_fn, STATS_2D_fn, STATS_0D
+    return DATA, STATS_1D, STATS_2D, STATS_1D_fn, STATS_2D_fn
 
 
 def run_model(model_fn, sil_layer='fc6', shuf_tissue_xy=False, nfeat_sample=1000, sil_type=1):
@@ -262,21 +258,20 @@ def run_model(model_fn, sil_layer='fc6', shuf_tissue_xy=False, nfeat_sample=1000
     STATS_2D = []
     for sigma in [1.0, 1.5, 2.0, 3.0, 5.0, 10.0, 20.0, 25.0, 50.0, 100.0]:
         if sigma < 20.0:
-            nsil_per_level = 50
+            nsil_per_level = 70
         elif sigma < 100.0:
-            nsil_per_level = 10
+            nsil_per_level = 50
         else:
-            nsil_per_level = 2
+            nsil_per_level = 10
         # nsil_per_level = int(np.ceil(ntrial_multiplier*(20.0/sigma)**2))
-        DATA, STATS_1D_, STATS_2D_, STATS_1D_fn, STATS_2D_fn, STATS_0D_ = silencing_exp_per_sigma(data, sigma, 
+        DATA, STATS_1D_, STATS_2D_, STATS_1D_fn, STATS_2D_fn = silencing_exp_per_sigma(data, sigma, 
             sil_layer=sil_layer, nfeat_sample=nfeat_sample, sil_type=sil_type, 
             nsil_per_level=nsil_per_level, shuf=shuf_tissue_xy)
-        STATS_0D.extend(STATS_0D_)
+        
         STATS_1D.extend(STATS_1D_)
         STATS_2D.extend(STATS_2D_)
         
     out = {
-        'STATS_0D': STATS_0D,
         'STATS_1D': STATS_1D,
         'STATS_2D': STATS_2D,
         'STATS_1D_fn': STATS_1D_fn,
