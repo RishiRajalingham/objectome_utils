@@ -1,3 +1,4 @@
+
 import numpy as np
 import cPickle as pk
 import scipy
@@ -15,9 +16,10 @@ import sys
 obj_oi = obj.HVM_10
 SUBSAMPLED_TASKS = [[1,0],[5,0],[5,1],[8,5],[9,5], [9,8]]
 
+# CAREFUL: meta is only for images of interest
 META = obj.hvm_meta()
 imgs_oi = np.array([ ((m['obj'] in obj_oi) & (m['var'] == 'V6')) for m in META])
-meta = META[imgs_oi]
+meta = META[imgs_oi] 
 
 imgids = []
 for m in meta:
@@ -28,9 +30,9 @@ opt['classifiertype'] = 'softmax'
 opt['model_spec'] = 'tissue_mapped'
 opt['train_q'] = lambda x: (x['id'] in set(imgids))
 opt['test_q'] = lambda x: (x['id'] in set(imgids))
-opt['n_splits'] = 20
-opt['npc_train'] = 39
-opt['npc_test'] = 1
+opt['n_splits'] = 10
+opt['npc_train'] = 30
+opt['npc_test'] = 10
 
 evalc = {
     'ctypes': [('dp_standard', 'dp_standard', {'kwargs': {'error': 'std'}})],
@@ -71,20 +73,17 @@ def load_tissue_mapped_models(feature_fn):
 
 def forward_pass(fc6, fc7_w):
     fc7_r = np.dot(fc6, fc7_w)
-    fc7_r[fc7_r < 0] = 0
+    fc7_r = fc7_r * (fc7_r > 0)
     return fc7_r
 
 def silence_factor_gaussian(dXY_i, sigma):
     return (1 - np.exp(-1 * (dXY_i/sigma)**2))
 
 def silence_factor_boxcar(dXY_i, sigma):
-    supp_factor = np.array([1-int(d < sigma) for d in dXY_i])
-    return supp_factor.astype('single')
+    return np.array([1-int(d < sigma) for d in dXY_i])
 
 def silence_factor_percent(dXY_i, persil):
-    thres = np.percentile(dXY_i, persil)
-    supp_factor = np.array([1-int(d < thres) for d in dXY_i])
-    return supp_factor.astype('single')
+    return np.array([1-int(d < np.percentile(dXY_i, persil)) for d in dXY_i])
 
 def silence_features_fc6(data, delete_feat_seed=None, sigma=1.0, shuf=False, sil_type=1):
     fc6_s = deepcopy(data['fc6'])
@@ -200,14 +199,15 @@ def silencing_exp_per_sigma(data, sigma, nfeat_sample=1000, sil_layer='fc6', sil
     features_base_all = data['fc7']
     nfeat_all = features_base_all.shape[1]
     feat_sample = np.random.choice(nfeat_all, nfeat_sample,replace=False)
-    features_base = np.squeeze(features_base_all[:,feat_sample])
+    features_base = np.squeeze(features_base_all[imgs_oi,:][:,feat_sample])
 
     rec = utils.compute_metric_base(features_base, meta, evalc, attach_models=True, return_splits=True)
     trials_base = om.multiclass_rec_to_trials(rec, features_base, meta)
     metric_base, del_base, del_rel_base = get_metric_subsampled_tasks(trials_base, meta, subsampled_tasks=SUBSAMPLED_TASKS)
-
+    
     perf_baseline = obj.get_mean_behavior(metric_base, metricn='O2_dprime')
     mu_baseline, spi_baseline = get_mu_sparse(perf_baseline)
+    print 'Baseline perf : ' + str(mu_baseline)
 
     DATA, STATS_1D = [],[]
     STATS_1D_fn = ['perc_del', 'sigma', 'x', 'y', 'mu_d', 'mu_dr', 'spi_d', 'spi_dr', 'mu_dp1', 'spi_d1', 'mu_dp0', 'sp1_d0']
@@ -216,15 +216,17 @@ def silencing_exp_per_sigma(data, sigma, nfeat_sample=1000, sil_layer='fc6', sil
         if sil_layer == 'fc6':
             features_s_all, delete_feat_seed = silence_features_fc6(data, delete_feat_seed=None, sigma=sigma, shuf=shuf, sil_type=sil_type)
         elif sil_layer == 'fc7':
-            features_s_all, delete_feat_seed = silence_features_fc7(data, delete_feat_seed=None, sigma=sigma, shuf=shuf, sil_type=sil_type)    
-        features_s = np.squeeze(features_s_all[:,feat_sample])
+            features_s_all, delete_feat_seed = silence_features_fc7(data, delete_feat_seed=None, sigma=sigma, shuf=shuf, sil_type=sil_type)  
+
+        features_s = np.squeeze(features_s_all[imgs_oi,:][:,feat_sample])
+
         trials_s = om.multiclass_rec_to_trials_heldout_features(rec, features_base, meta, [features_s])
         metric_s, delta_s, delta_s_rel = get_metric_subsampled_tasks(trials_s[0], meta, 
             subsampled_tasks=SUBSAMPLED_TASKS, metric_baseline=metric_base)
 
-        delta_features_norm = np.sum((features_base - features_s)**2)**0.5
-        features_norm = np.sum((features_base)**2)**0.5
-        perc_del = delta_features_norm / features_norm
+        delta_features_norm = np.linalg.norm((features_base - features_s))
+        delta_features_denom = np.linalg.norm((features_base + features_s))
+        perc_del = delta_features_norm.astype('single') / delta_features_denom.astype('single')
 
         xy = data['XY_fc6'][delete_feat_seed,:]
 
@@ -256,20 +258,19 @@ def run_model(model_fn, sil_layer='fc6', shuf_tissue_xy=False, nfeat_sample=1000
     STATS_0D = []
     STATS_1D = []
     STATS_2D = []
-    for sigma in [1.0, 1.5, 2.0, 3.0, 5.0, 10.0, 20.0, 25.0, 50.0, 100.0]:
+    niter = 5
+    for sigma in [1.0, 1.5, 2.0, 3.0, 5.0, 10.0, 15.0, 20.0, 25.0, 50.0]:
         if sigma < 20.0:
-            nsil_per_level = 70
-        elif sigma < 100.0:
-            nsil_per_level = 50
+            nsil_per_level = 5 # rishi : switch back to 50?
         else:
-            nsil_per_level = 10
-        # nsil_per_level = int(np.ceil(ntrial_multiplier*(20.0/sigma)**2))
-        DATA, STATS_1D_, STATS_2D_, STATS_1D_fn, STATS_2D_fn = silencing_exp_per_sigma(data, sigma, 
-            sil_layer=sil_layer, nfeat_sample=nfeat_sample, sil_type=sil_type, 
-            nsil_per_level=nsil_per_level, shuf=shuf_tissue_xy)
-        
-        STATS_1D.extend(STATS_1D_)
-        STATS_2D.extend(STATS_2D_)
+            nsil_per_level = 1
+        for i in range(niter):
+            DATA, STATS_1D_, STATS_2D_, STATS_1D_fn, STATS_2D_fn = silencing_exp_per_sigma(data, sigma, 
+                sil_layer=sil_layer, nfeat_sample=nfeat_sample, sil_type=sil_type, 
+                nsil_per_level=nsil_per_level, shuf=shuf_tissue_xy)
+            
+            STATS_1D.extend(STATS_1D_)
+            STATS_2D.extend(STATS_2D_)
         
     out = {
         'STATS_1D': STATS_1D,
@@ -283,6 +284,7 @@ def run_model(model_fn, sil_layer='fc6', shuf_tissue_xy=False, nfeat_sample=1000
     pk.dump(out, open(outfn + '.pkl', 'wb'))
     print outfn
     return
+
 
 
 def main(argv):
